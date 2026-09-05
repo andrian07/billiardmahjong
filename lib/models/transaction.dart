@@ -40,7 +40,6 @@ class Transaction {
     String? paymentMethodName,
   }) {
     final date = _parseDate(json['date']);
-    final tableNumber = _asInt(json['table']);
 
     return Transaction(
       id: _asInt(json['id']),
@@ -48,7 +47,7 @@ class Transaction {
       date: date,
       startAt: _combineDateTime(date, json['start_time']?.toString()),
       endAt: _combineDateTime(date, json['end_time']?.toString()),
-      tableName: "Meja ${tableNumber.toString().padLeft(2, '0')}",
+      tableName: _tableLabel(json),
       customerName: customerName,
       promoName: promoName,
       cashierName: json['created_by']?.toString() ?? "",
@@ -107,7 +106,6 @@ class TransactionDetail {
     String? paymentMethodName,
   }) {
     final date = _parseDate(json['date']);
-    final tableNumber = _asInt(json['table']);
     final promoJson = json['promo'];
 
     return TransactionDetail(
@@ -121,7 +119,7 @@ class TransactionDetail {
       discount: _asInt(json['discount']),
       tax: _asInt(json['tax']),
       totalBill: _asInt(json['total_bill']),
-      tableName: "Meja ${tableNumber.toString().padLeft(2, '0')}",
+      tableName: _tableLabel(json),
       status: _parseStatus(json['status']),
       createdBy: json['created_by']?.toString() ?? "",
       paidBy: _asInt(json['paid_by']),
@@ -137,6 +135,23 @@ class TransactionDetail {
 int _asInt(dynamic value) {
   if (value is int) return value;
   return int.tryParse(value?.toString() ?? "") ?? 0;
+}
+
+/// "Meja Private 1" / "Meja VVIP" / "Meja 01" — same "Meja `table_number`"
+/// convention as the live table grid (see table_repository.dart), using the
+/// real table_active.table_number the backend now joins in (`table_number`)
+/// instead of the raw `table` id (transaction_table FK), which used to be
+/// zero-padded and shown as-is (e.g. "Meja 13" for a table actually named
+/// "VVIP"). Falls back to the old id-based label only against a server that
+/// hasn't been updated yet (no `table_number` key at all).
+String _tableLabel(Map<String, dynamic> json) {
+  final tableNumber = json['table_number']?.toString().trim();
+  if (tableNumber != null && tableNumber.isNotEmpty) return "Meja $tableNumber";
+
+  if (!json.containsKey('table_number')) {
+    return "Meja ${_asInt(json['table']).toString().padLeft(2, '0')}";
+  }
+  return "Meja -";
 }
 
 DateTime _parseDate(dynamic value) {

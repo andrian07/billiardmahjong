@@ -22,6 +22,16 @@ class SyncRepositoryException implements Exception {
 class SyncRepository {
   final Dio _dio = Dio();
 
+  /// Cheap 4x COUNT(*) — no rows, no sorting — for [SyncWatcher]'s frequent
+  /// background poll, so an (almost always empty) tick stays lightweight.
+  Future<SyncPendingCounts> getPendingCount() async {
+    final data = await _post(ApiEndpoints.syncPendingCount, const {});
+    final result = data['result'];
+    return result is Map<String, dynamic>
+        ? SyncPendingCounts.fromJson(result)
+        : SyncPendingCounts.empty;
+  }
+
   Future<SyncPendingResult> getPending({
     required int page,
     required int perPage,

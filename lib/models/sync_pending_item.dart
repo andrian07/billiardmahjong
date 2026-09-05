@@ -7,7 +7,8 @@ enum SyncSourceType {
   transaction("transaction", "Billing"),
   transactionCafe("transaction_cafe", "Cafe / POS"),
   transaksiSaldo("transaksi_saldo", "Pengisian Saldo"),
-  purchase("purchase", "Pembelian");
+  purchase("purchase", "Pembelian"),
+  tableStatusEvent("table_status_event", "Status Meja");
 
   final String apiValue;
   final String label;
@@ -75,17 +76,20 @@ class SyncPendingCounts {
   final int transactionCafe;
   final int transaksiSaldo;
   final int purchase;
+  final int tableStatusEvent;
 
   const SyncPendingCounts({
     this.transaction = 0,
     this.transactionCafe = 0,
     this.transaksiSaldo = 0,
     this.purchase = 0,
+    this.tableStatusEvent = 0,
   });
 
   static const empty = SyncPendingCounts();
 
-  int get total => transaction + transactionCafe + transaksiSaldo + purchase;
+  int get total =>
+      transaction + transactionCafe + transaksiSaldo + purchase + tableStatusEvent;
 
   factory SyncPendingCounts.fromJson(Map<String, dynamic> json) {
     int asInt(dynamic value) {
@@ -98,6 +102,7 @@ class SyncPendingCounts {
       transactionCafe: asInt(json['transaction_cafe']),
       transaksiSaldo: asInt(json['transaksi_saldo']),
       purchase: asInt(json['purchase']),
+      tableStatusEvent: asInt(json['table_status_event']),
     );
   }
 }

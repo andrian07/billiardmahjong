@@ -102,7 +102,13 @@ class _TransactionPageState extends State<TransactionPage> {
     try {
       final detail = await _repository.getTransactionDetail(transaction.id);
 
-      final tableNumber = detail.tableName.replaceAll(RegExp(r'[^0-9]'), '');
+      // detail.tableName datang sebagai "Meja <table_number>" (mis. "Meja Private
+      // 1", "Meja VVIP") - "Meja" dilepas di sini karena strukLayout sudah
+      // menaruh label "Meja" sendiri di kolom sebelahnya (lihat TicketLayout.row).
+      final tableNumber = detail.tableName.replaceFirst(
+        RegExp(r'^Meja\s*', caseSensitive: false),
+        '',
+      );
       final modeLabel = switch (detail.mode) {
         SessionType.timer => "Timer",
         SessionType.reguler => "Reguler",

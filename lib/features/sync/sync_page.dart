@@ -41,6 +41,10 @@ class _SyncPageState extends State<SyncPage> {
   /// tombol baris lain tetap aktif selagi satu baris diproses.
   final Set<String> _retryingRows = {};
 
+  /// Alasan gagal upload terakhir per baris ("type:id" -> pesan dari gameon),
+  /// ditampilkan menempel di barisnya sampai baris itu di-retry lagi / berhasil.
+  final Map<String, String> _rowErrors = {};
+
   @override
   void initState() {
     super.initState();
@@ -63,6 +67,10 @@ class _SyncPageState extends State<SyncPage> {
         _pagination = result.pagination;
         _counts = result.counts;
         _loading = false;
+        // buang catatan error untuk baris yang sudah tidak ada di halaman ini
+        // (mis. sudah berhasil tersinkron) supaya map tidak menumpuk.
+        final visible = result.items.map(_rowKey).toSet();
+        _rowErrors.removeWhere((key, _) => !visible.contains(key));
       });
     } on SyncRepositoryException catch (e) {
       if (!mounted) return;
@@ -80,7 +88,10 @@ class _SyncPageState extends State<SyncPage> {
 
   Future<void> _retryOne(SyncPendingItem item) async {
     final key = _rowKey(item);
-    setState(() => _retryingRows.add(key));
+    setState(() {
+      _retryingRows.add(key);
+      _rowErrors.remove(key);
+    });
 
     try {
       await _repository.retry(type: item.type, id: item.id);
@@ -89,9 +100,21 @@ class _SyncPageState extends State<SyncPage> {
       await _load(_pagination.currentPage);
     } on SyncRepositoryException catch (e) {
       if (!mounted) return;
-      setState(() => _retryingRows.remove(key));
-      AppToast.error(context, "${item.inv}: ${e.message}");
+      setState(() {
+        _retryingRows.remove(key);
+        _rowErrors[key] = e.message;
+      });
+      AppToast.error(context, "${item.inv}: ${_cleanError(e.message)}");
     }
+  }
+
+  /// Buang awalan "Gagal upload ulang: " dari pesan backend — di UI ini
+  /// konteksnya sudah jelas gagal, jadi yang berguna cuma sebab aslinya.
+  String _cleanError(String message) {
+    const prefix = "Gagal upload ulang: ";
+    return message.startsWith(prefix)
+        ? message.substring(prefix.length)
+        : message;
   }
 
   /// Upload ulang berurutan untuk semua baris yang SEDANG tampil di halaman
@@ -100,7 +123,10 @@ class _SyncPageState extends State<SyncPage> {
   /// dilewati (tetap 'N', tersisa di daftar) tanpa menghentikan sisanya.
   Future<void> _retryAllOnPage() async {
     if (_retryingAll || _items.isEmpty) return;
-    setState(() => _retryingAll = true);
+    setState(() {
+      _retryingAll = true;
+      _rowErrors.clear();
+    });
 
     var succeeded = 0;
     var failed = 0;
@@ -108,8 +134,9 @@ class _SyncPageState extends State<SyncPage> {
       try {
         await _repository.retry(type: item.type, id: item.id);
         succeeded++;
-      } on SyncRepositoryException {
+      } on SyncRepositoryException catch (e) {
         failed++;
+        _rowErrors[_rowKey(item)] = e.message;
       }
     }
 
@@ -120,7 +147,7 @@ class _SyncPageState extends State<SyncPage> {
     } else {
       AppToast.error(
         context,
-        "$succeeded berhasil, $failed masih gagal (coba lagi nanti)",
+        "$succeeded berhasil, $failed masih gagal — lihat alasannya di tiap baris",
       );
     }
     await _load(_pagination.currentPage);
@@ -191,6 +218,16 @@ class _SyncPageState extends State<SyncPage> {
             color: AppColors.warning,
             label: "Pembelian",
             value: "${_counts.purchase}",
+            subtitle: "belum tersinkron",
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: StatCard(
+            icon: Icons.event_seat_outlined,
+            color: AppColors.primaryLight,
+            label: "Status Meja",
+            value: "${_counts.tableStatusEvent}",
             subtitle: "belum tersinkron",
           ),
         ),
@@ -313,7 +350,9 @@ class _SyncPageState extends State<SyncPage> {
   }
 
   Widget _buildRow(SyncPendingItem item) {
-    final retrying = _retryingRows.contains(_rowKey(item));
+    final key = _rowKey(item);
+    final retrying = _retryingRows.contains(key);
+    final error = _rowErrors[key];
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -355,6 +394,30 @@ class _SyncPageState extends State<SyncPage> {
                   overflow: TextOverflow.ellipsis,
                   style: AppText.caption,
                 ),
+                if (error != null) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.error_outline_rounded,
+                        size: 14,
+                        color: AppColors.danger,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          "Gagal: ${_cleanError(error)}",
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppText.caption.copyWith(
+                            color: AppColors.danger,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),

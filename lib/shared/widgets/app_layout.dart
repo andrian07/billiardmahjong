@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../services/booking_watcher.dart';
 import '../../services/session_storage.dart';
+import '../../services/sync_watcher.dart';
 import '../../services/timer_expiry_watcher.dart';
 import '../../services/topup_watcher.dart';
 import 'app_header.dart';
@@ -53,6 +54,7 @@ class _AppLayoutState extends State<AppLayout> {
     TimerExpiryWatcher.instance.start();
     TopupWatcher.instance.start();
     BookingWatcher.instance.start();
+    SyncWatcher.instance.start();
   }
 
   Future<void> _loadAllowedMenuKeys() async {

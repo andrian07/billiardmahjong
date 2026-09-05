@@ -84,6 +84,7 @@ class ApiEndpoints {
 
   // Sync (laporan online / gameon)
   static const String syncPending = "$baseUrl/Sync/pending";
+  static const String syncPendingCount = "$baseUrl/Sync/pending_count";
   static const String syncRetry = "$baseUrl/Sync/retry";
 
   // Billing

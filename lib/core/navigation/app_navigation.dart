@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../services/booking_watcher.dart';
 import '../../services/session_storage.dart';
+import '../../services/sync_watcher.dart';
 import '../../services/timer_expiry_watcher.dart';
 import '../../services/topup_watcher.dart';
 
@@ -39,6 +40,7 @@ Future<void> navigateToMenu(BuildContext context, String key) async {
     TimerExpiryWatcher.instance.stop();
     TopupWatcher.instance.stop();
     BookingWatcher.instance.stop();
+    SyncWatcher.instance.stop();
     await SessionStorage().clearSession();
     if (context.mounted) context.go('/login');
     return;
