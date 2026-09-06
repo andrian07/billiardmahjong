@@ -248,6 +248,7 @@ class _BillingPageState extends State<BillingPage> {
           endTime: endAt,
           duration: result.duration,
           useSavedTime: result.useSavedTime,
+          prepaidSaldo: result.prepaidSaldo,
           createdBy: createdBy,
           ignoreBookingWarning: ignoreBookingWarning,
           memberApprovalRef: approvalRef,

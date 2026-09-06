@@ -92,6 +92,40 @@ class _PaymentDialogState extends State<PaymentDialog> {
 
   bool get _isTimerMode => widget.table.sessionType == SessionType.timer;
 
+  /// "Simpan Sisa Waktu" hanya relevan kalau sesi Timer, fiturnya aktif, DAN
+  /// ada member (saldo waktu disimpan per member) - tanpa member bagian ini
+  /// tidak ditampilkan & tidak jadi syarat tombol konfirmasi.
+  bool get _showSaveTime =>
+      _isTimerMode && _canOfferSaveTime && _selectedCustomerId != null;
+
+  /// Kalau tidak null, metode pembayaran dikunci ke nama ini (lowercase):
+  ///  - "potong waktu": sesi dibuka dengan "pakai waktu tersimpan" (Rp0, sudah dipotong di awal).
+  ///  - "potong saldo" : sesi dibuka dengan "Potong Saldo di awal" DAN tagihan aktual <= yang
+  ///    dibayar di muka (selisih tinggal dikembalikan). Kalau tagihan > prepaid (overtime),
+  ///    metode TIDAK dikunci - kasir pilih bebas untuk menagih kekurangannya.
+  String? get _lockedPaymentMethodName {
+    if (widget.table.usedSavedTime == true) return 'potong waktu';
+    final calc = _calculation;
+    if (widget.table.prepaidSaldo &&
+        calc != null &&
+        calc.totalTransaksi <= widget.table.saldoPrepaidAmount) {
+      return 'potong saldo';
+    }
+    return null;
+  }
+
+  bool get _paymentLocked => _lockedPaymentMethodName != null;
+
+  /// Metode yang ditampilkan di dropdown: semua, kecuali saat terkunci -> hanya yang terkunci.
+  List<PaymentMethod> get _visiblePaymentMethods {
+    final locked = _lockedPaymentMethodName;
+    if (locked == null) return _paymentMethods;
+    final only = _paymentMethods
+        .where((m) => m.name.toLowerCase() == locked)
+        .toList();
+    return only.isNotEmpty ? only : _paymentMethods;
+  }
+
   /// True once the table's planned end time has passed — at that point
   /// there's no time left to carry over, so the save-time choice is locked
   /// to "Tidak" instead of being offered.
@@ -195,19 +229,11 @@ class _PaymentDialogState extends State<PaymentDialog> {
       final methods = await _paymentMethodRepository.getPaymentMethods();
       if (!mounted) return;
       setState(() {
-        // Sesi dibuka pakai waktu tersimpan: saldo waktu sudah dipotong & sudah
-        // lewat PIN member saat buka meja. Transaksi ini Rp0 dan metode bayarnya
-        // SELALU "Potong Waktu" - kunci dropdown ke situ, sembunyikan yang lain.
-        if (widget.table.usedSavedTime == true) {
-          final potongWaktu = methods
-              .where((m) => m.name.toLowerCase() == 'potong waktu')
-              .toList();
-          _paymentMethods = potongWaktu.isNotEmpty ? potongWaktu : methods;
-        } else {
-          _paymentMethods = methods;
-        }
-        _selectedPaymentMethod = _paymentMethods.isNotEmpty
-            ? _paymentMethods.first
+        _paymentMethods = methods;
+        // preselect: kalau metode terkunci (lihat _lockedPaymentMethodName), pilih itu;
+        // selain itu metode pertama.
+        _selectedPaymentMethod = _visiblePaymentMethods.isNotEmpty
+            ? _visiblePaymentMethods.first
             : null;
         _loadingPaymentMethods = false;
       });
@@ -229,12 +255,23 @@ class _PaymentDialogState extends State<PaymentDialog> {
     try {
       final result = await _billingRepository.calculatePrice(
         tableId: widget.table.id,
-        saveTime: _isTimerMode ? (_saveTime ?? false) : null,
+        saveTime: _showSaveTime ? (_saveTime ?? false) : null,
       );
       if (!mounted) return;
       setState(() {
         _calculation = _applyPromo(result, _selectedPromo);
         _calculating = false;
+        // metode terkunci baru bisa dievaluasi setelah tagihan diketahui (kasus
+        // "Potong Saldo di awal") - paksa pilihan ke metode yang terkunci.
+        final locked = _lockedPaymentMethodName;
+        if (locked != null) {
+          final m = _paymentMethods
+              .where((p) => p.name.toLowerCase() == locked)
+              .toList();
+          if (m.isNotEmpty && _selectedPaymentMethod?.id != m.first.id) {
+            _selectedPaymentMethod = m.first;
+          }
+        }
       });
     } on BillingRepositoryException catch (e) {
       if (!mounted) return;
@@ -415,7 +452,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
         paymentId: paymentMethod.id,
         customerId: _selectedCustomerId,
         promoId: _selectedPromo?.id,
-        saveTime: _canOfferSaveTime ? _saveTime : null,
+        saveTime: _showSaveTime ? _saveTime : null,
         remainingTime: _isTimerMode && endAt != null
             ? (endAt.isAfter(now) ? endAt.difference(now) : Duration.zero)
             : null,
@@ -729,14 +766,15 @@ class _PaymentDialogState extends State<PaymentDialog> {
                   prefixIcon: Icons.account_balance_wallet_outlined,
                 ),
                 items: [
-                  for (final method in _paymentMethods)
+                  for (final method in _visiblePaymentMethods)
                     DropdownMenuItem(
                       value: method,
                       child: Text(method.name),
                     ),
                 ],
-                // sesi "pakai waktu tersimpan" -> metode terkunci di "Potong Waktu"
-                onChanged: widget.table.usedSavedTime == true
+                // terkunci untuk sesi "pakai waktu tersimpan" (Potong Waktu) atau
+                // "Potong Saldo di awal" bila tagihan <= yang dibayar di muka.
+                onChanged: _paymentLocked
                     ? null
                     : (value) {
                         if (value == null) return;
@@ -759,7 +797,11 @@ class _PaymentDialogState extends State<PaymentDialog> {
             _label("Rincian Tagihan"),
             const SizedBox(height: 10),
             _buildBillingSummary(),
-            if (_isTimerMode && _checkingTimeSave) ...[
+            if (widget.table.prepaidSaldo) ...[
+              const SizedBox(height: 12),
+              _buildPrepaidNote(),
+            ],
+            if (_isTimerMode && _selectedCustomerId != null && _checkingTimeSave) ...[
               const SizedBox(height: 20),
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 10),
@@ -771,7 +813,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
                   ),
                 ),
               ),
-            ] else if (_isTimerMode && _canOfferSaveTime) ...[
+            ] else if (_showSaveTime) ...[
               const SizedBox(height: 20),
               _label("Simpan Sisa Waktu"),
               const SizedBox(height: 10),
@@ -841,6 +883,56 @@ class _PaymentDialogState extends State<PaymentDialog> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildPrepaidNote() {
+    final prepaid = widget.table.saldoPrepaidAmount;
+    final bill = _calculation?.totalTransaksi;
+    final shortfall = (bill != null && bill > prepaid) ? bill - prepaid : 0;
+    final refund = (bill != null && bill < prepaid) ? prepaid - bill : 0;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.info.withValues(alpha: .1),
+        borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+        border: Border.all(color: AppColors.info.withValues(alpha: .3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.verified_rounded, size: 15, color: AppColors.info),
+              const SizedBox(width: 6),
+              Text(
+                "Sudah dibayar di muka dari saldo: ${formatCurrency(prepaid)}",
+                style: AppText.caption.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          if (shortfall > 0) ...[
+            const SizedBox(height: 4),
+            Text(
+              "Kekurangan ${formatCurrency(shortfall)} — pilih metode bayar untuk selisihnya.",
+              style: AppText.caption.copyWith(color: AppColors.danger),
+            ),
+          ] else if (refund > 0) ...[
+            const SizedBox(height: 4),
+            Text(
+              "Selisih ${formatCurrency(refund)} akan dikembalikan ke saldo member.",
+              style: AppText.caption.copyWith(color: AppColors.success),
+            ),
+          ] else ...[
+            const SizedBox(height: 4),
+            Text(
+              "Tagihan pas dengan yang dibayar di muka — tidak ada potongan lagi.",
+              style: AppText.caption,
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -1056,7 +1148,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
         !_submitting &&
         _calculation != null &&
         _selectedPaymentMethod != null &&
-        (!_canOfferSaveTime || _saveTime != null);
+        (!_showSaveTime || _saveTime != null);
 
     return Container(
       decoration: BoxDecoration(

@@ -109,6 +109,9 @@ class TableRepository {
       endAt: endAt,
       plannedDuration: _parseDuration(json['table_duration']?.toString()),
       usedSavedTime: _parseYesNo(json['use_saved_time']?.toString()),
+      prepaidSaldo: json['prepaid_saldo']?.toString().toUpperCase() == "Y",
+      saldoPrepaidAmount:
+          int.tryParse(json['saldo_prepaid_amount']?.toString() ?? "") ?? 0,
       customerId: (customerId != null && customerId != 0) ? customerId : null,
       memberName: (memberName != null && memberName.trim().isNotEmpty)
           ? memberName

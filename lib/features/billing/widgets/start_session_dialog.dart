@@ -25,6 +25,9 @@ class StartSessionResult {
   final Duration? duration;
   final bool? useSavedTime;
 
+  /// Timer + member: potong saldo customer di muka (harga durasi penuh) saat buka meja.
+  final bool prepaidSaldo;
+
   const StartSessionResult({
     required this.sessionType,
     this.customerId,
@@ -33,6 +36,7 @@ class StartSessionResult {
     this.promo,
     this.duration,
     this.useSavedTime,
+    this.prepaidSaldo = false,
   });
 }
 
@@ -61,6 +65,13 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
   SavedCustomerTime? _savedTime;
   bool? _useSavedTime;
   bool? _habiskanTimer;
+
+  /// Timer + member + tidak pakai waktu tersimpan: pilihan "Potong saldo di awal?".
+  bool _prepaidSaldo = false;
+  bool get _canOfferPrepaidSaldo =>
+      _sessionType == SessionType.timer &&
+      _selectedCustomer != null &&
+      _useSavedTime != true;
 
   late final _hourController = TextEditingController(text: "$_durationHours");
   late final _minuteController = TextEditingController(
@@ -208,6 +219,7 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
       _savedTime = null;
       _useSavedTime = null;
       _habiskanTimer = null;
+      _prepaidSaldo = false;
       _checkingSavedTime = customer != null;
     });
 
@@ -230,7 +242,10 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
       _useSavedTime = value;
       _habiskanTimer = null;
       _durationError = null;
-      if (value) _sessionType = SessionType.timer;
+      if (value) {
+        _sessionType = SessionType.timer;
+        _prepaidSaldo = false; // saling eksklusif dgn "pakai waktu tersimpan"
+      }
       _durationHours = 0;
       _durationMinutes = 0;
       _hourController.text = "0";
@@ -322,6 +337,7 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
         promo: _selectedPromo?.name,
         duration: isTimer ? duration : null,
         useSavedTime: _savedTime != null ? (_useSavedTime ?? false) : null,
+        prepaidSaldo: _canOfferPrepaidSaldo && _prepaidSaldo,
       ),
     );
   }
@@ -480,6 +496,31 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
           ] else if (_savedTime != null) ...[
             const SizedBox(height: 14),
             _buildSavedTimeSection(_savedTime!),
+          ],
+
+          if (_canOfferPrepaidSaldo) ...[
+            const SizedBox(height: 20),
+            _label("Potong Saldo"),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _toggleOption(
+                    label: "Ya",
+                    selected: _prepaidSaldo,
+                    onTap: () => setState(() => _prepaidSaldo = true),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _toggleOption(
+                    label: "Tidak",
+                    selected: !_prepaidSaldo,
+                    onTap: () => setState(() => _prepaidSaldo = false),
+                  ),
+                ),
+              ],
+            ),
           ],
 
           if (_sessionType == SessionType.timer) ...[
@@ -693,6 +734,9 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
       onTap: enabled
           ? () => setState(() {
               _sessionType = type;
+              if (type == SessionType.reguler) {
+                _prepaidSaldo = false; // hanya untuk Timer
+              }
               if (type == SessionType.reguler && _useSavedTime != null) {
                 _useSavedTime = null;
                 _habiskanTimer = null;

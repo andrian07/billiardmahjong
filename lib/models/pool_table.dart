@@ -25,6 +25,11 @@ class PoolTable {
   final int? currentBill;
   final bool? usedSavedTime;
 
+  /// Sesi ini dibuka dengan "Potong Saldo di awal" - saldo customer sudah
+  /// dipotong sejumlah [saldoPrepaidAmount] saat buka meja.
+  final bool prepaidSaldo;
+  final int saldoPrepaidAmount;
+
   const PoolTable({
     required this.id,
     required this.name,
@@ -45,6 +50,8 @@ class PoolTable {
     this.plannedDuration,
     this.currentBill,
     this.usedSavedTime,
+    this.prepaidSaldo = false,
+    this.saldoPrepaidAmount = 0,
   });
 
   /// True when this table is running under a "Fix" package promo (fixed
@@ -70,6 +77,8 @@ class PoolTable {
     Duration? plannedDuration,
     int? currentBill,
     bool? usedSavedTime,
+    bool? prepaidSaldo,
+    int? saldoPrepaidAmount,
   }) {
     return PoolTable(
       id: id,
@@ -91,6 +100,8 @@ class PoolTable {
       plannedDuration: plannedDuration ?? this.plannedDuration,
       currentBill: currentBill ?? this.currentBill,
       usedSavedTime: usedSavedTime ?? this.usedSavedTime,
+      prepaidSaldo: prepaidSaldo ?? this.prepaidSaldo,
+      saldoPrepaidAmount: saldoPrepaidAmount ?? this.saldoPrepaidAmount,
     );
   }
 }
