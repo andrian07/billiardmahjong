@@ -133,8 +133,11 @@ class _MemberApprovalWaitDialogState extends State<MemberApprovalWaitDialog> {
             ),
             const SizedBox(height: 8),
             Text(
-              "Member sedang memasukkan PIN di aplikasinya untuk menyetujui "
-              "pembayaran ${formatCurrency(widget.amount)} lewat saldo.",
+              widget.amount > 0
+                  ? "Member sedang memasukkan PIN di aplikasinya untuk menyetujui "
+                        "pembayaran ${formatCurrency(widget.amount)} lewat saldo."
+                  : "Member sedang memasukkan PIN di aplikasinya untuk menyetujui "
+                        "pemakaian saldo waktu tersimpan.",
               style: AppText.bodySecondary,
               textAlign: TextAlign.center,
             ),

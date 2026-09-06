@@ -195,8 +195,20 @@ class _PaymentDialogState extends State<PaymentDialog> {
       final methods = await _paymentMethodRepository.getPaymentMethods();
       if (!mounted) return;
       setState(() {
-        _paymentMethods = methods;
-        _selectedPaymentMethod = methods.isNotEmpty ? methods.first : null;
+        // Sesi dibuka pakai waktu tersimpan: saldo waktu sudah dipotong & sudah
+        // lewat PIN member saat buka meja. Transaksi ini Rp0 dan metode bayarnya
+        // SELALU "Potong Waktu" - kunci dropdown ke situ, sembunyikan yang lain.
+        if (widget.table.usedSavedTime == true) {
+          final potongWaktu = methods
+              .where((m) => m.name.toLowerCase() == 'potong waktu')
+              .toList();
+          _paymentMethods = potongWaktu.isNotEmpty ? potongWaktu : methods;
+        } else {
+          _paymentMethods = methods;
+        }
+        _selectedPaymentMethod = _paymentMethods.isNotEmpty
+            ? _paymentMethods.first
+            : null;
         _loadingPaymentMethods = false;
       });
     } on PaymentMethodRepositoryException catch (e) {
@@ -723,10 +735,13 @@ class _PaymentDialogState extends State<PaymentDialog> {
                       child: Text(method.name),
                     ),
                 ],
-                onChanged: (value) {
-                  if (value == null) return;
-                  setState(() => _selectedPaymentMethod = value);
-                },
+                // sesi "pakai waktu tersimpan" -> metode terkunci di "Potong Waktu"
+                onChanged: widget.table.usedSavedTime == true
+                    ? null
+                    : (value) {
+                        if (value == null) return;
+                        setState(() => _selectedPaymentMethod = value);
+                      },
               ),
       ],
     );

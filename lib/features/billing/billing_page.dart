@@ -17,8 +17,10 @@ import '../../shared/widgets/pin_guard.dart';
 import '../cashier/data/cashier_repository.dart';
 import 'data/billing_repository.dart';
 import 'data/invoice_repository.dart';
+import 'data/member_approval_repository.dart';
 import 'data/table_repository.dart';
 import 'widgets/add_duration_dialog.dart';
+import 'widgets/member_approval_wait_dialog.dart';
 import 'widgets/move_table_dialog.dart';
 import 'widgets/payment_dialog.dart';
 import 'widgets/round_up_duration_dialog.dart';
@@ -232,6 +234,10 @@ class _BillingPageState extends State<BillingPage> {
       final session = await _sessionStorage.getSession();
       final createdBy = session?['username']?.toString();
 
+      // buka meja pakai waktu tersimpan -> backend menahan sampai member konfirmasi
+      // PIN di aplikasi GAMEON. 1 ref dipakai untuk percobaan pertama & ulang.
+      final approvalRef = generateApprovalRef();
+
       Future<void> book({bool ignoreBookingWarning = false}) {
         return _billingRepository.bookTable(
           tableId: table.id,
@@ -244,16 +250,46 @@ class _BillingPageState extends State<BillingPage> {
           useSavedTime: result.useSavedTime,
           createdBy: createdBy,
           ignoreBookingWarning: ignoreBookingWarning,
+          memberApprovalRef: approvalRef,
         );
       }
 
+      // jalankan book(); kalau backend minta PIN member, tampilkan dialog "menunggu
+      // konfirmasi" lalu ulangi book() dengan ref sama setelah disetujui. return
+      // false = dibatalkan / ditolak / kadaluarsa (pemanggil berhenti).
+      Future<bool> bookWithApproval({bool ignoreBookingWarning = false}) async {
+        try {
+          await book(ignoreBookingWarning: ignoreBookingWarning);
+          return true;
+        } on MemberApprovalRequiredException catch (e) {
+          if (!mounted) return false;
+          final outcome = await showDialog<MemberApprovalOutcome>(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => MemberApprovalWaitDialog(
+              ref: e.ref,
+              amount: e.amount,
+              expiresAt: e.expiresAt,
+            ),
+          );
+          if (outcome != MemberApprovalOutcome.approved) {
+            if (mounted) {
+              AppToast.error(context, _bookingApprovalMessage(outcome));
+            }
+            return false;
+          }
+          await book(ignoreBookingWarning: ignoreBookingWarning);
+          return true;
+        }
+      }
+
       try {
-        await book();
+        if (!await bookWithApproval()) return;
       } on BookingWarningException catch (w) {
         if (!mounted) return;
         final proceed = await _confirmBookingWarning(table, w.warnings);
         if (proceed != true) return;
-        await book(ignoreBookingWarning: true);
+        if (!await bookWithApproval(ignoreBookingWarning: true)) return;
       }
 
       if (!mounted) return;
@@ -263,6 +299,19 @@ class _BillingPageState extends State<BillingPage> {
     } on BillingRepositoryException catch (e) {
       if (!mounted) return;
       AppToast.error(context, e.message);
+    }
+  }
+
+  String _bookingApprovalMessage(MemberApprovalOutcome? o) {
+    switch (o) {
+      case MemberApprovalOutcome.rejected:
+        return "Member menolak konfirmasi PIN — meja tidak dibuka";
+      case MemberApprovalOutcome.expired:
+        return "Waktu konfirmasi PIN member habis — meja tidak dibuka";
+      case MemberApprovalOutcome.cancelled:
+        return "Konfirmasi PIN member dibatalkan — meja tidak dibuka";
+      default:
+        return "Konfirmasi PIN member gagal — meja tidak dibuka";
     }
   }
 

@@ -77,6 +77,7 @@ class BillingRepository {
     bool? useSavedTime,
     String? createdBy,
     bool ignoreBookingWarning = false,
+    String? memberApprovalRef,
   }) async {
     final payload = <String, dynamic>{
       "table_id": tableId,
@@ -89,6 +90,7 @@ class BillingRepository {
       if (useSavedTime != null) "use_saved_time": useSavedTime ? "Y" : "N",
       if (createdBy != null) "created_by": createdBy,
       if (ignoreBookingWarning) "ignore_booking_warning": "Y",
+      if (memberApprovalRef != null) "member_approval_ref": memberApprovalRef,
     };
 
     final data = await _post(ApiEndpoints.bookTable, payload);
@@ -101,6 +103,16 @@ class BillingRepository {
           ? raw.map((e) => e.toString()).toList()
           : <String>["Data booking perlu diperiksa sebelum membuka meja."];
       throw BookingWarningException(warnings);
+    }
+
+    // buka meja dengan "pakai waktu tersimpan": saldo waktu dipotong di sini, jadi
+    // backend menahan sampai member konfirmasi PIN di aplikasi GAMEON
+    if (data['result'] == 'NEED_MEMBER_APPROVAL') {
+      final approval = data['approval'];
+      throw MemberApprovalRequiredException.fromApproval(
+        memberApprovalRef ?? "",
+        approval is Map<String, dynamic> ? approval : null,
+      );
     }
   }
 
