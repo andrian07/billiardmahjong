@@ -74,6 +74,8 @@ class ApiEndpoints {
   static const String checkTimeSave = "$baseUrl/Master/check_time_save";
   static const String getSaveCustomerTime =
       "$baseUrl/Master/get_save_customer_time";
+  static const String customerTimeHistory =
+      "$baseUrl/Billing/customer_time_history";
 
   // Purchase
   static const String purchaseAdd = "$baseUrl/Purchase/purchase_add";

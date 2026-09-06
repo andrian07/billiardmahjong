@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 
 import '../../../core/constants/api_endpoints.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../models/customer_time_history_entry.dart';
 import '../../../models/pool_table.dart';
 import '../../../models/saved_customer_time.dart';
 import 'member_approval_repository.dart';
@@ -137,6 +138,28 @@ class BillingRepository {
     } on BillingRepositoryException {
       return null;
     }
+  }
+
+  /// "Kartu stok" waktu tersimpan 1 member (mutasi IN/OUT), terbaru dulu.
+  /// Proxy ke gameon lewat Billing/customer_time_history.
+  Future<List<CustomerTimeHistoryEntry>> getCustomerTimeHistory({
+    required int customerId,
+    int page = 1,
+    int perPage = 30,
+  }) async {
+    final data = await _post(ApiEndpoints.customerTimeHistory, {
+      "customer_id": customerId,
+      "page": page,
+      "per_page": perPage,
+    });
+
+    final result = data['result'];
+    final rows = result is Map<String, dynamic> ? result['data'] : null;
+    if (rows is! List) return const [];
+    return rows
+        .whereType<Map<String, dynamic>>()
+        .map(CustomerTimeHistoryEntry.fromJson)
+        .toList();
   }
 
   Future<PriceCalculation> calculatePrice({

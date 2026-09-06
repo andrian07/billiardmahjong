@@ -14,6 +14,7 @@ import '../../../shared/widgets/app_toast.dart';
 import '../../customer/data/customer_repository.dart';
 import '../../promo/data/promo_repository.dart';
 import '../data/billing_repository.dart';
+import 'member_time_history_dialog.dart';
 
 class StartSessionResult {
   final SessionType sessionType;
@@ -811,6 +812,31 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
               ),
             ],
           ),
+          if (_selectedCustomer != null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => showMemberTimeHistoryDialog(
+                  context,
+                  customerId: _selectedCustomer!.id,
+                  customerName: _selectedCustomer!.name,
+                ),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  minimumSize: const Size(0, 30),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                icon: const Icon(Icons.history_rounded, size: 15),
+                label: Text(
+                  "Lihat riwayat waktu",
+                  style: AppText.caption.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
           const SizedBox(height: 10),
           Text("Pakai waktu tersisa?", style: AppText.caption),
           const SizedBox(height: 8),
