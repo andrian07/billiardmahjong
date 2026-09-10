@@ -4,6 +4,8 @@ import 'package:dio/dio.dart';
 
 import '../../../core/constants/api_endpoints.dart';
 import '../../../models/customer.dart';
+import '../../../models/customer_point_history_entry.dart';
+import '../../../models/customer_saldo_history_entry.dart';
 import '../../../models/customer_time_balance.dart';
 import '../../../models/pagination_info.dart';
 
@@ -90,6 +92,52 @@ class CustomerRepository {
     return result
         .whereType<Map<String, dynamic>>()
         .map(CustomerTimeBalance.fromJson)
+        .toList();
+  }
+
+  /// Reads a member's saldo deductions (gameon `history_saldo`, OUT only),
+  /// newest first — shown in the "Potongan Saldo" tab of the Detail Member
+  /// dialog. Proxy via Billing/customer_saldo_history.
+  Future<List<CustomerSaldoHistoryEntry>> getSaldoDeductions(
+    int customerId, {
+    int page = 1,
+    int perPage = 50,
+  }) async {
+    final data = await _post(ApiEndpoints.customerSaldoHistory, {
+      "customer_id": customerId,
+      "page": page,
+      "per_page": perPage,
+    });
+
+    final result = data['result'];
+    final rows = result is Map<String, dynamic> ? result['data'] : null;
+    if (rows is! List) return const [];
+    return rows
+        .whereType<Map<String, dynamic>>()
+        .map(CustomerSaldoHistoryEntry.fromJson)
+        .toList();
+  }
+
+  /// Reads a member's point deductions (gameon `customer_point_history`, OUT
+  /// only), newest first — shown in the "Potongan Point" tab of the Detail
+  /// Member dialog. Proxy via Billing/customer_point_history.
+  Future<List<CustomerPointHistoryEntry>> getPointDeductions(
+    int customerId, {
+    int page = 1,
+    int perPage = 50,
+  }) async {
+    final data = await _post(ApiEndpoints.customerPointHistory, {
+      "customer_id": customerId,
+      "page": page,
+      "per_page": perPage,
+    });
+
+    final result = data['result'];
+    final rows = result is Map<String, dynamic> ? result['data'] : null;
+    if (rows is! List) return const [];
+    return rows
+        .whereType<Map<String, dynamic>>()
+        .map(CustomerPointHistoryEntry.fromJson)
         .toList();
   }
 

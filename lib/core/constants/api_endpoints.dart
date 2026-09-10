@@ -76,6 +76,10 @@ class ApiEndpoints {
       "$baseUrl/Master/get_save_customer_time";
   static const String customerTimeHistory =
       "$baseUrl/Billing/customer_time_history";
+  static const String customerSaldoHistory =
+      "$baseUrl/Billing/customer_saldo_history";
+  static const String customerPointHistory =
+      "$baseUrl/Billing/customer_point_history";
 
   // Purchase
   static const String purchaseAdd = "$baseUrl/Purchase/purchase_add";
@@ -140,21 +144,18 @@ class ApiEndpoints {
   static const String pinVerify = "$baseUrl/Pin/verify";
 
   // Setting
-  static const String pointExchangeList = "$baseUrl/Setting/point_exchange";
-  static const String addPointExchange = "$baseUrl/Setting/add_point_exchange";
-  static const String editPointExchange =
-      "$baseUrl/Setting/edit_point_exchange";
-  static const String deletePointExchange =
-      "$baseUrl/Setting/delete_point_exchange";
-  static const String broadcastMember = "$baseUrl/Master/broadcast_member";
+  // Menu "Tukar Point" sekarang read-only: riwayat penukaran point member
+  // (tabel reward_redemption di gameon), bukan lagi CRUD katalog hadiah.
+  static const String pointExchangeHistory =
+      "$baseUrl/Setting/point_exchange_history";
+  static const String pointExchangeClaim =
+      "$baseUrl/Setting/point_exchange_claim";
+  static const String pointExchangeUnclaim =
+      "$baseUrl/Setting/point_exchange_unclaim";
   static const String memberApprovalStatus =
       "$baseUrl/Master/member_approval_status";
   static const String memberApprovalCancel =
       "$baseUrl/Master/member_approval_cancel";
-  static const String gameList = "$baseUrl/Setting/game";
-  static const String addGame = "$baseUrl/Setting/add_game";
-  static const String editGame = "$baseUrl/Setting/edit_game";
-  static const String deleteGame = "$baseUrl/Setting/delete_game";
   static const String categoryMejaList = "$baseUrl/Setting/category_meja";
   static const String addCategoryMeja = "$baseUrl/Setting/add_category_meja";
   static const String editCategoryMeja = "$baseUrl/Setting/edit_category_meja";

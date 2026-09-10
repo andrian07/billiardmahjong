@@ -28,8 +28,6 @@ const _routesByKey = {
   'unit': '/unit',
   'kategori': '/kategori',
   'setting_table': '/setting/table',
-  'setting_game': '/setting/game',
-  'setting_broadcast': '/setting/broadcast',
   'setting_point_exchange': '/setting/point-exchange',
   'ganti_password': '/setting/ganti-password',
   'opname': '/opname',

@@ -16,10 +16,10 @@ import '../data/role_repository.dart';
 // accumulates leftover/test rows over time (old features, QA fixtures) that
 // no longer correspond to anything in the sidebar; anything not listed here
 // is filtered out of the dialog entirely so it can't drift out of sync with
-// what the sidebar actually shows. "opname" and "setting_broadcast" (both
-// owner-only by a separate, harder-coded mechanism) and "ganti_password" /
-// "booking" (always visible to everyone) are deliberately excluded too,
-// since none is actually role-gated.
+// what the sidebar actually shows. "opname" (owner-only by a separate,
+// harder-coded mechanism) and "ganti_password" / "booking" (always visible
+// to everyone) are deliberately excluded too, since none is actually
+// role-gated.
 const _sidebarMenuOrder = <String>[
   'meja', 'pos', 'transaksi',
   'master_member', 'master_pengguna', 'master_role', 'master_promo',

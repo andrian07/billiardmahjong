@@ -1,17 +1,23 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_sizes.dart';
 import '../../core/navigation/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text.dart';
+import '../../core/utils/formatters.dart';
 import '../../models/pagination_info.dart';
 import '../../models/point_exchange.dart';
+import '../../services/session_storage.dart';
 import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/app_layout.dart';
 import '../../shared/widgets/app_toast.dart';
 import 'data/point_exchange_repository.dart';
-import 'widgets/point_exchange_form_dialog.dart';
 
+/// "Tukar Point" — riwayat penukaran point member (dari tabel reward_redemption
+/// di gameon). Katalog hadiah tidak dikelola di sini; satu-satunya aksi tulis
+/// adalah menandai kupon terpakai (Redeemed -> Claimed) dan membatalkannya.
 class PointExchangePage extends StatefulWidget {
   const PointExchangePage({super.key});
 
@@ -23,15 +29,48 @@ class _PointExchangePageState extends State<PointExchangePage> {
   static const _perPage = 10;
 
   final _repository = PointExchangeRepository();
+  final _sessionStorage = SessionStorage();
+  final _searchCtrl = TextEditingController();
 
-  List<PointExchange> _items = [];
+  List<PointRedemption> _items = [];
   PaginationInfo _pagination = PaginationInfo.empty;
   bool _loading = true;
   String? _error;
+  int? _busyId;
+  String _query = "";
+  Timer? _searchDebounce;
 
   @override
   void initState() {
     super.initState();
+    _load(1);
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  // Live search — refetch (page 1) a short beat after the user stops typing,
+  // same feel as the Transaksi page but server-side since this list is paged.
+  void _onSearchChanged(String value) {
+    setState(() {}); // refresh the clear (×) button
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      final next = value.trim();
+      if (next == _query) return;
+      _query = next;
+      _load(1);
+    });
+  }
+
+  void _clearSearch() {
+    _searchDebounce?.cancel();
+    if (_query.isEmpty && _searchCtrl.text.isEmpty) return;
+    _searchCtrl.clear();
+    _query = "";
     _load(1);
   }
 
@@ -42,9 +81,10 @@ class _PointExchangePageState extends State<PointExchangePage> {
     });
 
     try {
-      final result = await _repository.getPointExchanges(
+      final result = await _repository.getRedemptionHistory(
         page: page,
         perPage: _perPage,
+        search: _query.isEmpty ? null : _query,
       );
       if (!mounted) return;
       setState(() {
@@ -66,10 +106,28 @@ class _PointExchangePageState extends State<PointExchangePage> {
     _load(page);
   }
 
+  static const _months = [
+    "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
+    "Jul", "Agu", "Sep", "Okt", "Nov", "Des",
+  ];
+
+  String _fmtWhen(DateTime? at) {
+    if (at == null) return "-";
+    String two(int n) => n.toString().padLeft(2, '0');
+    return "${at.day} ${_months[at.month - 1]} ${at.year} • "
+        "${two(at.hour)}:${two(at.minute)}";
+  }
+
+  String _fmtDay(DateTime? at) {
+    if (at == null) return "-";
+    return "${at.day} ${_months[at.month - 1]} ${at.year}";
+  }
+
   Future<bool> _confirm({
     required String title,
     required String message,
     required String confirmLabel,
+    bool danger = false,
   }) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -83,12 +141,12 @@ class _PointExchangePageState extends State<PointExchangePage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text("TIDAK"),
+            child: const Text("BATAL"),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.danger,
+              backgroundColor: danger ? AppColors.danger : AppColors.primary,
               foregroundColor: Colors.white,
             ),
             child: Text(confirmLabel),
@@ -99,69 +157,58 @@ class _PointExchangePageState extends State<PointExchangePage> {
     return confirmed == true;
   }
 
-  Future<void> _openAddDialog() async {
-    final result = await showDialog<PointExchangeFormResult>(
-      context: context,
-      builder: (_) => const PointExchangeFormDialog(),
+  Future<void> _claim(PointRedemption item) async {
+    final ok = await _confirm(
+      title: "Tandai Kupon Terpakai?",
+      message:
+          "Hadiah \"${item.rewardName}\" milik ${item.customerName} "
+          "(kode ${item.redeemCode}) akan ditandai sudah diserahkan / terpakai.",
+      confirmLabel: "YA, TANDAI",
     );
-    if (result == null) return;
+    if (!ok) return;
 
+    final session = await _sessionStorage.getSession();
+    final createdBy = session?['username']?.toString() ?? "";
+
+    setState(() => _busyId = item.id);
     try {
-      await _repository.addPointExchange(
-        name: result.name,
-        point: result.point,
-        description: result.description,
-        image: result.image,
-      );
-      if (!mounted) return;
-      AppToast.success(context, "${result.name} berhasil ditambahkan");
-      await _load(_pagination.currentPage);
-    } on PointExchangeRepositoryException catch (e) {
-      if (!mounted) return;
-      AppToast.error(context, e.message);
-    }
-  }
-
-  Future<void> _openEditDialog(PointExchange item) async {
-    final result = await showDialog<PointExchangeFormResult>(
-      context: context,
-      builder: (_) => PointExchangeFormDialog(item: item),
-    );
-    if (result == null) return;
-
-    try {
-      await _repository.editPointExchange(
+      final msg = await _repository.claimRedemption(
         id: item.id,
-        name: result.name,
-        point: result.point,
-        description: result.description,
-        image: result.image,
+        createdBy: createdBy,
       );
       if (!mounted) return;
-      AppToast.success(context, "${result.name} berhasil diperbarui");
+      AppToast.success(context, msg);
       await _load(_pagination.currentPage);
     } on PointExchangeRepositoryException catch (e) {
       if (!mounted) return;
       AppToast.error(context, e.message);
+    } finally {
+      if (mounted) setState(() => _busyId = null);
     }
   }
 
-  Future<void> _confirmDelete(PointExchange item) async {
-    final confirmed = await _confirm(
-      title: "Hapus Hadiah?",
-      message: "Apakah Anda yakin akan menghapus hadiah \"${item.name}\"?",
-      confirmLabel: "YA, HAPUS",
+  Future<void> _unclaim(PointRedemption item) async {
+    final ok = await _confirm(
+      title: "Batalkan Klaim Kupon?",
+      message:
+          "Kupon \"${item.rewardName}\" milik ${item.customerName} "
+          "(kode ${item.redeemCode}) akan dikembalikan ke status belum terpakai.",
+      confirmLabel: "YA, BATALKAN",
+      danger: true,
     );
-    if (!confirmed) return;
+    if (!ok) return;
 
+    setState(() => _busyId = item.id);
     try {
-      await _repository.deletePointExchange(item.id);
+      final msg = await _repository.unclaimRedemption(id: item.id);
       if (!mounted) return;
-      AppToast.success(context, "${item.name} berhasil dihapus");
+      AppToast.success(context, msg);
       await _load(_pagination.currentPage);
     } on PointExchangeRepositoryException catch (e) {
       if (!mounted) return;
       AppToast.error(context, e.message);
+    } finally {
+      if (mounted) setState(() => _busyId = null);
     }
   }
 
@@ -169,7 +216,7 @@ class _PointExchangePageState extends State<PointExchangePage> {
   Widget build(BuildContext context) {
     return AppLayout(
       title: "Tukar Point",
-      subtitle: "Kelola hadiah penukaran point member",
+      subtitle: "Riwayat penukaran point member",
       showSearch: false,
       activeMenuKey: "setting_point_exchange",
       onMenuSelect: (key) => navigateToMenu(context, key),
@@ -190,7 +237,7 @@ class _PointExchangePageState extends State<PointExchangePage> {
           if (!_loading && _error == null && _items.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(36, 14, 36, 6),
-              child: _PointExchangeRow.header(),
+              child: _RedemptionRow.header(),
             ),
           Expanded(child: _buildBody()),
           if (!_loading && _error == null && _items.isNotEmpty) ...[
@@ -226,14 +273,21 @@ class _PointExchangePageState extends State<PointExchangePage> {
         return _RowCard(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: _PointExchangeRow.data(
+            child: _RedemptionRow.data(
               no:
                   (_pagination.currentPage - 1) * _pagination.perPage +
                   index +
                   1,
               item: item,
-              onEdit: () => _openEditDialog(item),
-              onDelete: () => _confirmDelete(item),
+              when: _fmtWhen(item.createdAt),
+              claimLine: item.isClaimed
+                  ? "Terpakai ${_fmtDay(item.claimedAt)}"
+                        "${item.claimedBy.isEmpty ? "" : " • ${item.claimedBy}"}"
+                  : null,
+              busy: _busyId == item.id,
+              anyBusy: _busyId != null,
+              onClaim: () => _claim(item),
+              onUnclaim: () => _unclaim(item),
             ),
           ),
         );
@@ -264,32 +318,35 @@ class _PointExchangePageState extends State<PointExchangePage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              "Daftar Tukar Point",
+              "Riwayat Penukaran Point",
               style: AppText.title.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 2),
             Text(
               _loading || _error != null
                   ? "Memuat data..."
-                  : "${_pagination.totalItems} hadiah aktif",
+                  : _query.isEmpty
+                  ? "${_pagination.totalItems} penukaran tercatat"
+                  : "${_pagination.totalItems} hasil untuk \"$_query\"",
               style: AppText.caption,
             ),
           ],
         ),
         const Spacer(),
+        _buildSearchField(),
+        const SizedBox(width: 8),
         SizedBox(
           height: 40,
-          child: ElevatedButton.icon(
-            onPressed: _openAddDialog,
-            icon: const Icon(Icons.add_rounded, size: 18),
+          child: OutlinedButton.icon(
+            onPressed: _loading ? null : () => _load(_pagination.currentPage),
+            icon: const Icon(Icons.refresh_rounded, size: 16),
             label: Text(
-              "Tambah Hadiah",
+              "Muat Ulang",
               style: AppText.button.copyWith(fontSize: 13),
             ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              elevation: 0,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.text,
+              side: const BorderSide(color: AppColors.border),
               padding: const EdgeInsets.symmetric(horizontal: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
@@ -298,6 +355,45 @@ class _PointExchangePageState extends State<PointExchangePage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildSearchField() {
+    return SizedBox(
+      width: 280,
+      height: 40,
+      child: TextField(
+        controller: _searchCtrl,
+        onChanged: _onSearchChanged,
+        textInputAction: TextInputAction.search,
+        style: AppText.body.copyWith(fontSize: 13),
+        decoration: InputDecoration(
+          isDense: true,
+          hintText: "Cari kode kupon / nama member",
+          hintStyle: AppText.caption.copyWith(fontSize: 13),
+          prefixIcon: const Icon(Icons.search_rounded, size: 18),
+          prefixIconConstraints: const BoxConstraints(minWidth: 38),
+          suffixIcon: _searchCtrl.text.isEmpty
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 16),
+                  splashRadius: 16,
+                  tooltip: "Hapus pencarian",
+                  onPressed: _clearSearch,
+                ),
+          contentPadding: const EdgeInsets.symmetric(vertical: 10),
+          filled: true,
+          fillColor: AppColors.background.withValues(alpha: .4),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+            borderSide: const BorderSide(color: AppColors.border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+            borderSide: const BorderSide(color: AppColors.primary),
+          ),
+        ),
+      ),
     );
   }
 
@@ -321,7 +417,27 @@ class _PointExchangePageState extends State<PointExchangePage> {
             ),
           ),
           const SizedBox(height: 14),
-          Text("Belum ada hadiah ditemukan", style: AppText.bodySecondary),
+          Text(
+            _query.isEmpty
+                ? "Belum ada penukaran point"
+                : "Tidak ada penukaran yang cocok dengan \"$_query\"",
+            style: AppText.bodySecondary,
+          ),
+          if (_query.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _clearSearch,
+              icon: const Icon(Icons.close_rounded, size: 16),
+              label: const Text("Hapus pencarian"),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.text,
+                side: const BorderSide(color: AppColors.border),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -383,7 +499,7 @@ class _PointExchangePageState extends State<PointExchangePage> {
     return Row(
       children: [
         Text(
-          "Menampilkan $startItem-$endItem dari ${p.totalItems} hadiah",
+          "Menampilkan $startItem-$endItem dari ${p.totalItems} penukaran",
           style: AppText.caption,
         ),
         const Spacer(),
@@ -534,25 +650,37 @@ class _RowCardState extends State<_RowCard> {
   }
 }
 
-class _PointExchangeRow extends StatelessWidget {
+class _RedemptionRow extends StatelessWidget {
   final bool header;
   final int? no;
-  final PointExchange? item;
-  final VoidCallback? onEdit;
-  final VoidCallback? onDelete;
+  final PointRedemption? item;
+  final String? when;
+  final String? claimLine;
+  final bool busy;
+  final bool anyBusy;
+  final VoidCallback? onClaim;
+  final VoidCallback? onUnclaim;
 
-  const _PointExchangeRow.header()
+  const _RedemptionRow.header()
     : header = true,
       no = null,
       item = null,
-      onEdit = null,
-      onDelete = null;
+      when = null,
+      claimLine = null,
+      busy = false,
+      anyBusy = false,
+      onClaim = null,
+      onUnclaim = null;
 
-  const _PointExchangeRow.data({
+  const _RedemptionRow.data({
     required this.no,
     required this.item,
-    required this.onEdit,
-    required this.onDelete,
+    required this.when,
+    required this.claimLine,
+    required this.busy,
+    required this.anyBusy,
+    required this.onClaim,
+    required this.onUnclaim,
   }) : header = false;
 
   @override
@@ -560,121 +688,139 @@ class _PointExchangeRow extends StatelessWidget {
     if (header) {
       return _row(
         no: _headerText("NO"),
-        name: _headerText("HADIAH"),
-        desc: _headerText("DESKRIPSI"),
+        when: _headerText("TANGGAL"),
+        member: _headerText("MEMBER"),
+        reward: _headerText("HADIAH"),
         point: _headerText("POINT", alignEnd: true),
-        aksi: _headerText("AKSI", alignCenter: true),
+        code: _headerText("KODE"),
+        status: _headerText("STATUS", alignCenter: true),
+        action: _headerText("AKSI", alignCenter: true),
       );
     }
 
-    final p = item!;
+    final r = item!;
     final cellStyle = AppText.caption.copyWith(fontSize: 13);
 
     return _row(
       no: Text("$no", style: cellStyle.copyWith(color: AppColors.textHint)),
-      name: Row(
+      when: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(AppSizes.radiusSmall),
-            child: SizedBox(
-              width: 32,
-              height: 32,
-              child: p.imageUrl.isNotEmpty
-                  ? Image.network(
-                      p.imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => _thumbnailPlaceholder(),
-                    )
-                  : _thumbnailPlaceholder(),
-            ),
+          Text(
+            when ?? "-",
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: cellStyle.copyWith(color: AppColors.textSecondary),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              p.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: cellStyle.copyWith(fontWeight: FontWeight.w600),
+          if (claimLine != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                claimLine!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: cellStyle.copyWith(
+                  fontSize: 11,
+                  color: AppColors.success,
+                ),
+              ),
             ),
-          ),
         ],
       ),
-      desc: Text(
-        p.description.isEmpty ? "-" : p.description,
-        maxLines: 1,
+      member: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            r.customerName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: cellStyle.copyWith(fontWeight: FontWeight.w600),
+          ),
+          if (r.customerPhone.isNotEmpty)
+            Text(
+              r.customerPhone,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: cellStyle.copyWith(color: AppColors.textHint),
+            ),
+        ],
+      ),
+      reward: Text(
+        r.rewardName,
+        maxLines: 2,
         overflow: TextOverflow.ellipsis,
         style: cellStyle.copyWith(color: AppColors.textSecondary),
       ),
       point: Text(
-        "${p.point}",
+        formatThousands(r.pointSpent),
         textAlign: TextAlign.end,
         style: cellStyle.copyWith(fontWeight: FontWeight.w600),
       ),
-      aksi: Center(
-        child: PopupMenuButton<String>(
-          tooltip: "Aksi",
-          color: AppColors.card,
-          icon: const Icon(
-            Icons.more_vert_rounded,
-            size: 18,
-            color: AppColors.textSecondary,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-            side: const BorderSide(color: AppColors.border),
-          ),
-          onSelected: (value) {
-            switch (value) {
-              case 'edit':
-                onEdit?.call();
-                break;
-              case 'delete':
-                onDelete?.call();
-                break;
-            }
-          },
-          itemBuilder: (context) => [
-            PopupMenuItem(
-              value: 'edit',
-              child: _menuItem(Icons.edit_outlined, "Edit"),
-            ),
-            PopupMenuItem(
-              value: 'delete',
-              child: _menuItem(
-                Icons.delete_outline_rounded,
-                "Hapus",
-                color: AppColors.danger,
-              ),
-            ),
-          ],
+      code: Text(
+        r.redeemCode.isEmpty ? "-" : r.redeemCode,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: cellStyle.copyWith(
+          fontWeight: FontWeight.w600,
+          letterSpacing: .3,
         ),
       ),
+      status: Center(child: _StatusChip(status: r.status)),
+      action: Center(child: _actionButton(r)),
     );
   }
 
-  static Widget _thumbnailPlaceholder() {
-    return Container(
-      color: AppColors.textHint.withValues(alpha: .12),
-      alignment: Alignment.center,
-      child: const Icon(
-        Icons.image_outlined,
-        size: 16,
-        color: AppColors.textHint,
-      ),
-    );
-  }
+  Widget _actionButton(PointRedemption r) {
+    if (busy) {
+      return const SizedBox(
+        width: 18,
+        height: 18,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
+    }
 
-  static Widget _menuItem(IconData icon, String label, {Color? color}) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 18, color: color ?? AppColors.textSecondary),
-        const SizedBox(width: 10),
-        Text(
-          label,
-          style: AppText.body.copyWith(color: color ?? AppColors.text),
+    if (r.isRedeemed) {
+      return SizedBox(
+        height: 32,
+        child: ElevatedButton.icon(
+          onPressed: anyBusy ? null : onClaim,
+          icon: const Icon(Icons.check_circle_outline_rounded, size: 15),
+          label: const Text("Terpakai"),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.success,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            textStyle: AppText.button.copyWith(fontSize: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppSizes.radiusSmall),
+            ),
+          ),
         ),
-      ],
+      );
+    }
+
+    if (r.isClaimed) {
+      return SizedBox(
+        height: 32,
+        child: TextButton.icon(
+          onPressed: anyBusy ? null : onUnclaim,
+          icon: const Icon(Icons.undo_rounded, size: 15),
+          label: const Text("Batalkan"),
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.danger,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            textStyle: AppText.button.copyWith(fontSize: 12),
+          ),
+        ),
+      );
+    }
+
+    return Text(
+      "-",
+      style: AppText.caption.copyWith(fontSize: 13, color: AppColors.textHint),
     );
   }
 
@@ -698,24 +844,76 @@ class _PointExchangeRow extends StatelessWidget {
 
   static Widget _row({
     required Widget no,
-    required Widget name,
-    required Widget desc,
+    required Widget when,
+    required Widget member,
+    required Widget reward,
     required Widget point,
-    required Widget aksi,
+    required Widget code,
+    required Widget status,
+    required Widget action,
   }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         SizedBox(width: 28, child: no),
         const SizedBox(width: 10),
-        Expanded(flex: 3, child: name),
+        Expanded(flex: 3, child: when),
         const SizedBox(width: 10),
-        Expanded(flex: 3, child: desc),
+        Expanded(flex: 3, child: member),
         const SizedBox(width: 10),
-        SizedBox(width: 80, child: point),
+        Expanded(flex: 3, child: reward),
         const SizedBox(width: 10),
-        SizedBox(width: 48, child: aksi),
+        SizedBox(width: 64, child: point),
+        const SizedBox(width: 10),
+        SizedBox(width: 104, child: code),
+        const SizedBox(width: 10),
+        SizedBox(width: 88, child: status),
+        const SizedBox(width: 10),
+        SizedBox(width: 116, child: action),
       ],
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  final String status;
+
+  const _StatusChip({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    if (status.isEmpty) {
+      return Text("-", style: AppText.caption.copyWith(fontSize: 13));
+    }
+
+    final s = status.toLowerCase();
+    final Color color;
+    if (s.contains('claim') || s.contains('done') || s.contains('selesai')) {
+      color = AppColors.success;
+    } else if (s.contains('cancel') ||
+        s.contains('batal') ||
+        s.contains('expired')) {
+      color = AppColors.danger;
+    } else {
+      color = AppColors.primary;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        status,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: AppText.caption.copyWith(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
     );
   }
 }

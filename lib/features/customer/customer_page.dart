@@ -17,6 +17,7 @@ import '../../shared/widgets/app_layout.dart';
 import '../../shared/widgets/app_toast.dart';
 import 'data/customer_repository.dart';
 import 'widgets/add_saldo_dialog.dart';
+import 'widgets/customer_detail_dialog.dart';
 import 'widgets/customer_saved_time_dialog.dart';
 
 class CustomerPage extends StatefulWidget {
@@ -232,6 +233,10 @@ class _CustomerPageState extends State<CustomerPage> {
     );
   }
 
+  Future<void> _openDetailDialog(Customer customer) {
+    return showCustomerDetailDialog(context, customer: customer);
+  }
+
   Future<void> _confirmResetPassword(Customer customer) async {
     final confirmed = await _confirm(
       title: "Reset Password?",
@@ -318,6 +323,7 @@ class _CustomerPageState extends State<CustomerPage> {
                   index +
                   1,
               customer: customer,
+              onViewDetail: () => _openDetailDialog(customer),
               onViewSavedTime: () => _openSavedTimeDialog(customer),
               onResetPassword: () => _confirmResetPassword(customer),
               onDelete: () => _confirmDelete(customer),
@@ -672,6 +678,7 @@ class _CustomerRow extends StatelessWidget {
   final bool header;
   final int? no;
   final Customer? customer;
+  final VoidCallback? onViewDetail;
   final VoidCallback? onViewSavedTime;
   final VoidCallback? onResetPassword;
   final VoidCallback? onDelete;
@@ -680,6 +687,7 @@ class _CustomerRow extends StatelessWidget {
     : header = true,
       no = null,
       customer = null,
+      onViewDetail = null,
       onViewSavedTime = null,
       onResetPassword = null,
       onDelete = null;
@@ -687,6 +695,7 @@ class _CustomerRow extends StatelessWidget {
   const _CustomerRow.data({
     required this.no,
     required this.customer,
+    required this.onViewDetail,
     required this.onViewSavedTime,
     required this.onResetPassword,
     required this.onDelete,
@@ -773,6 +782,9 @@ class _CustomerRow extends StatelessWidget {
             ),
             onSelected: (value) {
               switch (value) {
+                case 'detail':
+                  onViewDetail?.call();
+                  break;
                 case 'saved_time':
                   onViewSavedTime?.call();
                   break;
@@ -785,6 +797,13 @@ class _CustomerRow extends StatelessWidget {
               }
             },
             itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'detail',
+                child: _menuItem(
+                  Icons.receipt_long_rounded,
+                  "Detail Member",
+                ),
+              ),
               PopupMenuItem(
                 value: 'saved_time',
                 child: _menuItem(
