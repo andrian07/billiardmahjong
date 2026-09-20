@@ -66,6 +66,7 @@ class ApiEndpoints {
   static const String addProduct = "$baseUrl/Master/add_product";
   static const String editProduct = "$baseUrl/Master/edit_product";
   static const String deleteProduct = "$baseUrl/Master/delete_product";
+  static const String syncProductStock = "$baseUrl/Master/sync_product_stock";
 
   // Master payment
   static const String paymentList = "$baseUrl/Master/get_payment_list";

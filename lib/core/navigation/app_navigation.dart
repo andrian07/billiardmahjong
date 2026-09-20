@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../services/booking_watcher.dart';
+import '../../services/product_stock_sync_watcher.dart';
 import '../../services/session_storage.dart';
 import '../../services/sync_watcher.dart';
 import '../../services/timer_expiry_watcher.dart';
@@ -39,6 +40,7 @@ Future<void> navigateToMenu(BuildContext context, String key) async {
     TopupWatcher.instance.stop();
     BookingWatcher.instance.stop();
     SyncWatcher.instance.stop();
+    ProductStockSyncWatcher.instance.stop();
     await SessionStorage().clearSession();
     if (context.mounted) context.go('/login');
     return;

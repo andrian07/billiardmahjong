@@ -126,6 +126,14 @@ class ProductRepository {
     return _post(ApiEndpoints.deleteProduct, {"product_id": id});
   }
 
+  /// Pushes a full snapshot of this branch's product catalog (stock +
+  /// HPP/COGS) to gameon — see [ProductStockSyncWatcher], which calls this
+  /// every 30 minutes so gameon's copy never drifts far from the branch's
+  /// real stock/COGS.
+  Future<void> syncStockToGameon({required int branch}) {
+    return _post(ApiEndpoints.syncProductStock, {"branch": branch});
+  }
+
   Future<Map<String, dynamic>> _postForm(String url, FormData formData) async {
     try {
       final response = await _dio.post(url, data: formData);
