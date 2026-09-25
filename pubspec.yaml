@@ -1,5 +1,5 @@
-name: billiard_billing
-description: Billing System for Billiard
+name: mahjong_billiard_billing
+description: Billing System for Mahjong & Billiard
 publish_to: "none"
 
 version: 1.21.0+36

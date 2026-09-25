@@ -1,7 +1,7 @@
 class ApiEndpoints {
   ApiEndpoints._();
 
-  static const String baseUrl = "http://localhost/billing_api";
+  static const String baseUrl = "http://localhost/mahjongbilliard_backend";
 
   // Auth
   static const String login = "$baseUrl/Auth/login";
@@ -25,8 +25,7 @@ class ApiEndpoints {
       "$baseUrl/Master/customer_list_no_pagging";
   static const String getTimePerCustomer =
       "$baseUrl/Master/get_time_per_customer";
-  static const String addCustomerSaldo =
-      "$baseUrl/Master/add_customer_saldo";
+  static const String addCustomerSaldo = "$baseUrl/Master/add_customer_saldo";
   static const String syncCustomer = "$baseUrl/Master/sync_customer";
 
   // Master price
@@ -127,7 +126,8 @@ class ApiEndpoints {
       "$baseUrl/Cafe/rename_keep_transaction";
   static const String transactionCafeList =
       "$baseUrl/Cafe/transaction_cafe_list";
-  static const String transactionCafeDetail = "$baseUrl/Cafe/transaction_detail";
+  static const String transactionCafeDetail =
+      "$baseUrl/Cafe/transaction_detail";
   static const String cancelTransactionCafe =
       "$baseUrl/Cafe/cancel_transaction_cafe";
   static const String editPaymentTransactionCafe =
@@ -163,8 +163,7 @@ class ApiEndpoints {
   static const String deleteCategoryMeja =
       "$baseUrl/Setting/delete_category_meja";
   static const String saldoList = "$baseUrl/Setting/saldo_list";
-  static const String saldoNoPaging =
-      "$baseUrl/Setting/saldo_list_no_pagging";
+  static const String saldoNoPaging = "$baseUrl/Setting/saldo_list_no_pagging";
   static const String addSaldo = "$baseUrl/Setting/add_saldo";
   static const String editSaldo = "$baseUrl/Setting/edit_saldo";
   static const String deleteSaldo = "$baseUrl/Setting/delete_saldo";
@@ -183,11 +182,9 @@ class ApiEndpoints {
   static const String purchaseSuppliers = "$baseUrl/Report/purchase_suppliers";
 
   // Access (roles & menu permissions)
-  static const String roleListNoPaging =
-      "$baseUrl/Access/role_list_no_pagging";
+  static const String roleListNoPaging = "$baseUrl/Access/role_list_no_pagging";
   static const String addRole = "$baseUrl/Access/add_role";
-  static const String menuListNoPaging =
-      "$baseUrl/Access/menu_list_no_pagging";
+  static const String menuListNoPaging = "$baseUrl/Access/menu_list_no_pagging";
   static const String roleAccess = "$baseUrl/Access/role_access";
   static const String updateRoleAccess = "$baseUrl/Access/update_role_access";
 

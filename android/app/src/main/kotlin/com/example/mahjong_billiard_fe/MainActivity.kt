@@ -1,4 +1,4 @@
-package com.example.billing_fe
+package com.example.mahjong_billiard_fe
 
 import io.flutter.embedding.android.FlutterActivity
 
