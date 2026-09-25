@@ -15,6 +15,7 @@ import '../../services/session_storage.dart';
 import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/app_layout.dart';
 import '../../shared/widgets/app_toast.dart';
+import '../../shared/widgets/pin_guard.dart';
 import 'data/transaction_repository.dart';
 import 'widgets/cafe_transaction_list.dart';
 import 'widgets/edit_payment_dialog.dart';
@@ -30,7 +31,7 @@ class TransactionPage extends StatefulWidget {
 
 enum _SortField { date, total }
 
-enum _TransactionTab { billing, cafe, saldo }
+enum _TransactionTab { billing, mahjong, cafe, saldo }
 
 class _TransactionPageState extends State<TransactionPage> {
   static const _pageSize = 10;
@@ -51,8 +52,10 @@ class _TransactionPageState extends State<TransactionPage> {
   int _page = 0;
   _SortField _sortField = _SortField.date;
   bool _sortAscending = false;
+
   int? _reprintingId;
   int? _editingPaymentId;
+  int? _cancelingId;
 
   @override
   void initState() {
@@ -185,6 +188,76 @@ class _TransactionPageState extends State<TransactionPage> {
     }
   }
 
+  /// Only offered when the backend would actually allow it — see
+  /// Billing_model::cancel_transaction: "Potong Saldo" and "Gunakan Timer"
+  /// are rejected there because the saldo/time already deducted at gameon
+  /// has no stored ref to refund automatically.
+  bool _canCancel(Transaction transaction) {
+    return transaction.status == TransactionStatus.completed &&
+        transaction.paymentMethod != "Potong Saldo" &&
+        transaction.paymentType != "Gunakan Timer";
+  }
+
+  Future<void> _cancelTransaction(Transaction transaction) async {
+    if (_cancelingId != null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSizes.radiusLarge),
+        ),
+        title: Text("Batalkan Transaksi?", style: AppText.title),
+        content: Text(
+          "Transaksi ${transaction.invoiceNumber} akan ditandai dibatalkan "
+          "dan tidak lagi dihitung ke total transaksi.",
+          style: AppText.bodySecondary,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text("TIDAK"),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text("YA, BATALKAN"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    if (!mounted) return;
+    if (!await PinGuard.confirm(context)) return;
+
+    setState(() => _cancelingId = transaction.id);
+    try {
+      final session = await SessionStorage().getSession();
+      final createdBy = session?['username']?.toString() ?? "";
+      await _repository.cancelBillingTransaction(
+        transactionId: transaction.id,
+        createdBy: createdBy,
+      );
+      if (!mounted) return;
+      AppToast.success(
+        context,
+        "Transaksi ${transaction.invoiceNumber} dibatalkan",
+      );
+      await _load();
+    } on TransactionRepositoryException catch (e) {
+      if (!mounted) return;
+      AppToast.error(context, e.message);
+    } finally {
+      if (mounted) setState(() => _cancelingId = null);
+    }
+  }
+
   void _openDetail(Transaction transaction) {
     showDialog<void>(
       context: context,
@@ -205,11 +278,24 @@ class _TransactionPageState extends State<TransactionPage> {
     });
   }
 
+  /// "Billing" tab = billiard, "Mahjong" tab = mahjong (lihat
+  /// Transaction.categoryType, snapshot dari table_category saat pembayaran -
+  /// Billing_model::add_transaction). Cafe/Saldo tidak difilter kategori.
+  String? get _tabCategoryFilter => switch (_tab) {
+    _TransactionTab.billing => "billiard",
+    _TransactionTab.mahjong => "mahjong",
+    _TransactionTab.cafe || _TransactionTab.saldo => null,
+  };
+
   List<Transaction> get _filtered {
     final query = _search.trim().toLowerCase();
+    final categoryFilter = _tabCategoryFilter;
 
     final filtered = _transactions.where((t) {
       if (!_matchesDateRange(t.date)) return false;
+      if (categoryFilter != null && t.categoryType != categoryFilter) {
+        return false;
+      }
       if (query.isEmpty) return true;
 
       return t.invoiceNumber.toLowerCase().contains(query) ||
@@ -323,6 +409,7 @@ class _TransactionPageState extends State<TransactionPage> {
   ) {
     switch (_tab) {
       case _TransactionTab.billing:
+      case _TransactionTab.mahjong:
         if (_loading) return const Center(child: CircularProgressIndicator());
         if (_loadError != null) return _buildErrorState(_loadError!);
         return _buildCard(filtered, pageItems, page, pageCount);
@@ -343,6 +430,8 @@ class _TransactionPageState extends State<TransactionPage> {
     return Row(
       children: [
         _tabChip(_TransactionTab.billing, "Billing", Icons.receipt_long_outlined),
+        const SizedBox(width: 10),
+        _tabChip(_TransactionTab.mahjong, "Mahjong", Icons.casino_outlined),
         const SizedBox(width: 10),
         _tabChip(_TransactionTab.cafe, "Cafe", Icons.local_cafe_outlined),
         const SizedBox(width: 10),
@@ -545,6 +634,10 @@ class _TransactionPageState extends State<TransactionPage> {
                       onEditPayment: () => _editPayment(pageItems[index]),
                       editingPayment:
                           _editingPaymentId == pageItems[index].id,
+                      onCancel: _canCancel(pageItems[index])
+                          ? () => _cancelTransaction(pageItems[index])
+                          : null,
+                      canceling: _cancelingId == pageItems[index].id,
                     ),
                   ),
           ),
@@ -699,6 +792,8 @@ class _TransactionRow extends StatelessWidget {
   final bool reprinting;
   final VoidCallback? onEditPayment;
   final bool editingPayment;
+  final VoidCallback? onCancel;
+  final bool canceling;
 
   const _TransactionRow.header({
     required this.sortField,
@@ -713,7 +808,9 @@ class _TransactionRow extends StatelessWidget {
        onReprint = null,
        reprinting = false,
        onEditPayment = null,
-       editingPayment = false;
+       editingPayment = false,
+       onCancel = null,
+       canceling = false;
 
   const _TransactionRow.data({
     required this.no,
@@ -724,6 +821,8 @@ class _TransactionRow extends StatelessWidget {
     this.reprinting = false,
     this.onEditPayment,
     this.editingPayment = false,
+    this.onCancel,
+    this.canceling = false,
   }) : header = false,
        sortField = null,
        sortAscending = false,
@@ -835,6 +934,10 @@ class _TransactionRow extends StatelessWidget {
                         editing: editingPayment,
                         onTap: onEditPayment,
                       ),
+                    ],
+                    if (onCancel != null) ...[
+                      const SizedBox(width: 6),
+                      _CancelButton(canceling: canceling, onTap: onCancel),
                     ],
                   ],
                 )
@@ -1043,6 +1146,56 @@ class _EditPaymentButton extends StatelessWidget {
             Icons.sync_alt_rounded,
             size: 16,
             color: AppColors.textSecondary,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CancelButton extends StatelessWidget {
+  final bool canceling;
+  final VoidCallback? onTap;
+
+  const _CancelButton({required this.canceling, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    if (canceling) {
+      return const SizedBox(
+        width: 30,
+        height: 30,
+        child: Center(
+          child: SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: AppColors.danger,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Tooltip(
+      message: "Batalkan transaksi",
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Container(
+          width: 30,
+          height: 30,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.danger.withValues(alpha: .4)),
+          ),
+          child: const Icon(
+            Icons.cancel_outlined,
+            size: 16,
+            color: AppColors.danger,
           ),
         ),
       ),

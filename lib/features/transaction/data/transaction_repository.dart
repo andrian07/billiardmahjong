@@ -201,6 +201,22 @@ class TransactionRepository {
     });
   }
 
+  /// Rejected server-side (and kept out of reach client-side too — see
+  /// TransactionPage's cancel button visibility) when the transaction was
+  /// paid via "Potong Saldo" or "Gunakan Timer" (saved-time balance) - the
+  /// customer's saldo/time was already deducted at gameon and there's no
+  /// stored ref to refund it automatically. See
+  /// Billing_model::cancel_transaction on the backend for the full reasoning.
+  Future<void> cancelBillingTransaction({
+    required int transactionId,
+    required String createdBy,
+  }) async {
+    await _post(ApiEndpoints.cancelTransaction, {
+      "transaction_id": transactionId,
+      "created_by": createdBy,
+    });
+  }
+
   /// Rejected server-side (and kept out of reach client-side too) when the
   /// transaction's old or new payment method is "Potong Saldo" — no logic
   /// exists to correct the customer's saldo for a payment-method edit made

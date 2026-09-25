@@ -63,10 +63,12 @@ class TableCategoryRepository {
   Future<int> addTableCategory({
     required String name,
     required int priceOption,
+    required String type,
   }) async {
     final data = await _post(ApiEndpoints.addCategoryMeja, {
       "category_meja_name": name.trim(),
       "category_meja_price": priceOption,
+      "category_meja_type": type,
     });
 
     final rawId = data['category_meja_id'];
@@ -74,17 +76,19 @@ class TableCategoryRepository {
   }
 
   /// Only the fields passed in are updated — at least one of
-  /// [name]/[active]/[priceOption] must be given.
+  /// [name]/[active]/[priceOption]/[type] must be given.
   Future<void> editTableCategory({
     required int id,
     String? name,
     bool? active,
     int? priceOption,
+    String? type,
   }) {
     final payload = <String, dynamic>{"category_meja_id": id};
     if (name != null) payload["category_meja_name"] = name.trim();
     if (active != null) payload["category_meja_active"] = active ? "Y" : "N";
     if (priceOption != null) payload["category_meja_price"] = priceOption;
+    if (type != null) payload["category_meja_type"] = type;
 
     return _post(ApiEndpoints.editCategoryMeja, payload);
   }

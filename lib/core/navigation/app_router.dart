@@ -81,7 +81,24 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: "/meja",
-      pageBuilder: (context, state) => _fadeThroughPage(const BillingPage()),
+      // key beda dari /mahjong di bawah WAJIB ada - tanpa ini Flutter menganggap kedua
+      // BillingPage ini widget yang "sama" (tipe sama, tidak ada key) dan cuma meng-update
+      // instance lama saat pindah route alih-alih membuat baru, jadi initState()/_loadTables()
+      // tidak pernah jalan ulang dan daftar meja nyangkut di data halaman yang dibuka duluan.
+      pageBuilder: (context, state) => _fadeThroughPage(
+        const BillingPage(key: ValueKey("meja")),
+      ),
+    ),
+    GoRoute(
+      path: "/mahjong",
+      pageBuilder: (context, state) => _fadeThroughPage(
+        const BillingPage(
+          key: ValueKey("mahjong"),
+          categoryType: "mahjong",
+          pageTitle: "Mahjong",
+          menuKey: "mahjong",
+        ),
+      ),
     ),
     GoRoute(
       path: "/pos",

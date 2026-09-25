@@ -29,9 +29,15 @@ class TableRepository {
   final Dio _dio = Dio();
   final _promoRepository = PromoRepository();
 
-  Future<List<PoolTable>> getTables() async {
+  /// [categoryType]: 'billiard'/'mahjong' filters server-side (see
+  /// Billing::get_table_list) so the Billing/Mahjong pages only ever fetch
+  /// their own half of the table roster; null returns every table.
+  Future<List<PoolTable>> getTables({String? categoryType}) async {
     try {
-      final response = await _dio.post(ApiEndpoints.tableList, data: const {});
+      final response = await _dio.post(
+        ApiEndpoints.tableList,
+        data: categoryType != null ? {"table_type": categoryType} : const {},
+      );
 
       var data = response.data;
       if (data is String) {
@@ -98,9 +104,12 @@ class TableRepository {
 
     return PoolTable(
       id: json['table_id']?.toString() ?? "",
-      name: "Meja $number",
+      name: number,
       status: isRunning ? TableStatus.playing : TableStatus.ready,
       categoryMejaId: int.tryParse(json['table_category']?.toString() ?? ""),
+      categoryType: json['category_type']?.toString() == "mahjong"
+          ? "mahjong"
+          : "billiard",
       badge: mode,
       sessionType: _parseSessionType(mode),
       startTime: startAt != null ? formatTime(startAt) : null,

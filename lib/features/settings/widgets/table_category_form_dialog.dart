@@ -10,6 +10,7 @@ import '../data/table_setting_repository.dart';
 class TableCategoryFormResult {
   final String name;
   final bool active;
+  final String type;
   final int priceOption;
 
   /// Table ids the user checked to use this category — see the "Meja yang
@@ -22,6 +23,7 @@ class TableCategoryFormResult {
   const TableCategoryFormResult({
     required this.name,
     required this.active,
+    required this.type,
     required this.priceOption,
     this.selectedTableIds = const [],
   });
@@ -44,6 +46,7 @@ class _TableCategoryFormDialogState extends State<TableCategoryFormDialog> {
     text: widget.category?.name ?? "",
   );
   late bool _active = widget.category?.active ?? true;
+  late String _type = widget.category?.type ?? "billiard";
   late int _priceOption = widget.category?.priceOption ?? 1;
 
   bool get _isEdit => widget.category != null;
@@ -100,6 +103,7 @@ class _TableCategoryFormDialogState extends State<TableCategoryFormDialog> {
       TableCategoryFormResult(
         name: _nameController.text.trim(),
         active: _active,
+        type: _type,
         priceOption: _priceOption,
         selectedTableIds: _selectedTableIds.toList(),
       ),
@@ -114,124 +118,198 @@ class _TableCategoryFormDialogState extends State<TableCategoryFormDialog> {
       ),
       backgroundColor: AppColors.card,
       insetPadding: const EdgeInsets.all(24),
-      child: Container(
-        width: 400,
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppSizes.radiusXL),
-          border: Border.all(color: AppColors.border),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
         ),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(),
-              const SizedBox(height: 20),
-              const Divider(color: AppColors.divider, height: 1),
-              const SizedBox(height: 22),
+        child: Container(
+          width: 400,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppSizes.radiusXL),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(),
+                const SizedBox(height: 20),
+                const Divider(color: AppColors.divider, height: 1),
+                const SizedBox(height: 22),
 
-              _label("Nama Kategori"),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _nameController,
-                autofocus: true,
-                style: AppText.body,
-                decoration: _inputDecoration(
-                  hint: "Mis. VIP, Reguler",
-                  prefixIcon: Icons.category_outlined,
-                ),
-                validator: (value) => (value == null || value.trim().isEmpty)
-                    ? "Nama kategori wajib diisi"
-                    : null,
-                onFieldSubmitted: (_) => _submit(),
-              ),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _label("Nama Kategori"),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _nameController,
+                          autofocus: true,
+                          style: AppText.body,
+                          decoration: _inputDecoration(
+                            hint: "Mis. VIP, Reguler",
+                            prefixIcon: Icons.category_outlined,
+                          ),
+                          validator: (value) =>
+                              (value == null || value.trim().isEmpty)
+                              ? "Nama kategori wajib diisi"
+                              : null,
+                          onFieldSubmitted: (_) => _submit(),
+                        ),
 
-              const SizedBox(height: 16),
-              _label("Harga yang Digunakan"),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<int>(
-                initialValue: _priceOption,
-                dropdownColor: AppColors.card,
-                style: AppText.body,
-                isExpanded: true,
-                icon: const Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  color: AppColors.textSecondary,
-                ),
-                decoration: _inputDecoration(
-                  prefixIcon: Icons.payments_outlined,
-                ),
-                items: [
-                  for (var i = 1; i <= 5; i++)
-                    DropdownMenuItem(value: i, child: Text("Harga $i")),
-                ],
-                onChanged: (value) {
-                  if (value == null) return;
-                  setState(() => _priceOption = value);
-                },
-              ),
+                        const SizedBox(height: 16),
+                        _label("Jenis Meja"),
+                        const SizedBox(height: 8),
+                        _buildTypeSelector(),
 
-              if (_isEdit) ...[
-                const SizedBox(height: 16),
-                _buildActiveToggle(),
+                        const SizedBox(height: 16),
+                        _label("Harga yang Digunakan"),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<int>(
+                          initialValue: _priceOption,
+                          dropdownColor: AppColors.card,
+                          style: AppText.body,
+                          isExpanded: true,
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: AppColors.textSecondary,
+                          ),
+                          decoration: _inputDecoration(
+                            prefixIcon: Icons.payments_outlined,
+                          ),
+                          items: [
+                            for (var i = 1; i <= 5; i++)
+                              DropdownMenuItem(
+                                value: i,
+                                child: Text("Harga $i"),
+                              ),
+                          ],
+                          onChanged: (value) {
+                            if (value == null) return;
+                            setState(() => _priceOption = value);
+                          },
+                        ),
+
+                        if (_isEdit) ...[
+                          const SizedBox(height: 16),
+                          _buildActiveToggle(),
+                        ],
+
+                        const SizedBox(height: 16),
+                        _label("Meja yang Memakai Kategori Ini"),
+                        const SizedBox(height: 8),
+                        _buildTableSelector(),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 28),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.textSecondary,
+                          side: const BorderSide(color: AppColors.border),
+                          minimumSize: const Size(0, 48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              AppSizes.radiusMedium,
+                            ),
+                          ),
+                        ),
+                        child: const Text("BATAL"),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton.icon(
+                        onPressed: _submit,
+                        icon: Icon(
+                          _isEdit ? Icons.save_outlined : Icons.add_rounded,
+                          size: 20,
+                        ),
+                        label: Text(_isEdit ? "SIMPAN" : "TAMBAH KATEGORI"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(0, 48),
+                          elevation: 0,
+                          textStyle: AppText.button,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              AppSizes.radiusMedium,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ],
-
-              const SizedBox(height: 16),
-              _label("Meja yang Memakai Kategori Ini"),
-              const SizedBox(height: 8),
-              _buildTableSelector(),
-
-              const SizedBox(height: 28),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.textSecondary,
-                        side: const BorderSide(color: AppColors.border),
-                        minimumSize: const Size(0, 48),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                            AppSizes.radiusMedium,
-                          ),
-                        ),
-                      ),
-                      child: const Text("BATAL"),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: ElevatedButton.icon(
-                      onPressed: _submit,
-                      icon: Icon(
-                        _isEdit ? Icons.save_outlined : Icons.add_rounded,
-                        size: 20,
-                      ),
-                      label: Text(_isEdit ? "SIMPAN" : "TAMBAH KATEGORI"),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size(0, 48),
-                        elevation: 0,
-                        textStyle: AppText.button,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                            AppSizes.radiusMedium,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildTypeSelector() {
+    Widget option(String value, String label, IconData icon) {
+      final selected = _type == value;
+      return Expanded(
+        child: InkWell(
+          onTap: () => setState(() => _type = value),
+          borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: selected
+                  ? AppColors.primary.withValues(alpha: .15)
+                  : AppColors.background,
+              borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+              border: Border.all(
+                color: selected ? AppColors.primary : AppColors.border,
+                width: selected ? 1.5 : 1,
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  size: 20,
+                  color: selected ? AppColors.primary : AppColors.textSecondary,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  style: AppText.body.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: selected ? AppColors.primary : AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        option("billiard", "Billiard", Icons.table_bar_rounded),
+        const SizedBox(width: 12),
+        option("mahjong", "Mahjong", Icons.casino_outlined),
+      ],
     );
   }
 
@@ -315,7 +393,7 @@ class _TableCategoryFormDialogState extends State<TableCategoryFormDialog> {
                 dense: true,
                 controlAffinity: ListTileControlAffinity.leading,
                 title: Text(
-                  "Meja ${table.number}",
+                  table.number,
                   style: AppText.body.copyWith(fontSize: 13),
                 ),
                 subtitle: table.categoryName != null

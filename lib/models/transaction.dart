@@ -17,6 +17,21 @@ class Transaction {
   final int total;
   final TransactionStatus status;
 
+  /// 'billiard' or 'mahjong' — snapshot taken at payment time (see
+  /// Billing_model::add_transaction on the backend), used to filter the
+  /// Billing tab on the Transaksi page.
+  final String categoryType;
+
+  /// Who cancelled this transaction, if [status] is canceled.
+  final String? cancelledBy;
+
+  /// 'Normal' or 'Gunakan Timer' (paid using the customer's saved-time
+  /// balance) — used alongside [paymentMethod] to decide whether the Cancel
+  /// button can be shown (see Billing_model::cancel_transaction on the
+  /// backend: both "Potong Saldo" and "Gunakan Timer" are rejected there
+  /// because the deducted saldo/time has no stored ref to refund).
+  final String paymentType;
+
   const Transaction({
     required this.id,
     required this.invoiceNumber,
@@ -31,6 +46,9 @@ class Transaction {
     required this.paymentMethod,
     required this.total,
     this.status = TransactionStatus.completed,
+    this.categoryType = "billiard",
+    this.cancelledBy,
+    this.paymentType = "Normal",
   });
 
   factory Transaction.fromJson(
@@ -55,6 +73,11 @@ class Transaction {
       paymentMethod: paymentMethodName ?? "-",
       total: _asInt(json['total_bill']),
       status: _parseStatus(json['status']),
+      categoryType: json['category_type']?.toString() == "mahjong"
+          ? "mahjong"
+          : "billiard",
+      cancelledBy: json['cancelled_by']?.toString(),
+      paymentType: json['payment_type']?.toString() ?? "Normal",
     );
   }
 }

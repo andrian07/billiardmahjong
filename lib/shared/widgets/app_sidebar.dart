@@ -31,9 +31,14 @@ class AppSidebar extends StatelessWidget {
       title: "TRANSAKSI",
       items: [
         AppMenuItem(
-          title: "Meja",
+          title: "Billing",
           icon: Icons.table_bar_rounded,
           menuKey: "meja",
+        ),
+        AppMenuItem(
+          title: "Mahjong",
+          icon: Icons.casino_outlined,
+          menuKey: "mahjong",
         ),
         AppMenuItem(
           title: "POS",

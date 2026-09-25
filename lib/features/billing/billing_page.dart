@@ -7,14 +7,12 @@ import '../../core/navigation/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text.dart';
 import '../../core/utils/formatters.dart';
-import '../../models/cashier_summary.dart';
 import '../../models/pool_table.dart';
 import '../../services/receipt_printer_service.dart';
 import '../../services/session_storage.dart';
 import '../../shared/widgets/app_layout.dart';
 import '../../shared/widgets/app_toast.dart';
 import '../../shared/widgets/pin_guard.dart';
-import '../cashier/data/cashier_repository.dart';
 import 'data/billing_repository.dart';
 import 'data/invoice_repository.dart';
 import 'data/member_approval_repository.dart';
@@ -24,12 +22,22 @@ import 'widgets/member_approval_wait_dialog.dart';
 import 'widgets/move_table_dialog.dart';
 import 'widgets/payment_dialog.dart';
 import 'widgets/round_up_duration_dialog.dart';
-import 'widgets/stat_card.dart';
 import 'widgets/start_session_dialog.dart';
 import 'widgets/table_card.dart';
 
+/// Also serves the "Mahjong" menu — same UI/logic, filtered to the other
+/// category type via [categoryType]. See app_router.dart's `/mahjong` route.
 class BillingPage extends StatefulWidget {
-  const BillingPage({super.key});
+  final String categoryType;
+  final String pageTitle;
+  final String menuKey;
+
+  const BillingPage({
+    super.key,
+    this.categoryType = "billiard",
+    this.pageTitle = "Billing",
+    this.menuKey = "meja",
+  });
 
   @override
   State<BillingPage> createState() => _BillingPageState();
@@ -47,42 +55,12 @@ class _BillingPageState extends State<BillingPage> {
   final _invoiceRepository = InvoiceRepository();
   final _receiptPrinter = ReceiptPrinterService();
   final _sessionStorage = SessionStorage();
-  final _cashierRepository = CashierRepository();
-
-  CashierClosingSummary? _cashierSummary;
-  bool _isOwner = false;
 
   @override
   void initState() {
     super.initState();
     _loadTables();
-    _loadCashierSummary();
-    _loadRole();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
-  }
-
-  // "Rincian Transaksi Billing/Cafe" (ringkasan omzet hari ini) hanya untuk owner
-  Future<void> _loadRole() async {
-    final isOwner = await _sessionStorage.isSuperadmin();
-    if (!mounted) return;
-    setState(() => _isOwner = isOwner);
-  }
-
-  /// Powers the "Rincian Transaksi Billing/Cafe" stat cards — today's
-  /// per-cashier totals from Report/get_transaction_today_by_cashier.
-  Future<void> _loadCashierSummary() async {
-    final session = await _sessionStorage.getSession();
-    final userId = int.tryParse(session?['id']?.toString() ?? "") ?? 0;
-    if (userId == 0) return;
-
-    try {
-      final summary = await _cashierRepository.getTodaySummary(userId: userId);
-
-      if (!mounted) return;
-      setState(() => _cashierSummary = summary);
-    } on CashierRepositoryException {
-      // Silent — stat cards just keep showing the last known totals.
-    }
   }
 
   @override
@@ -93,7 +71,6 @@ class _BillingPageState extends State<BillingPage> {
 
   void _refreshAll() {
     _loadTables();
-    _loadCashierSummary();
   }
 
   Future<void> _loadTables() async {
@@ -103,7 +80,9 @@ class _BillingPageState extends State<BillingPage> {
     });
 
     try {
-      final tables = await _tableRepository.getTables();
+      final tables = await _tableRepository.getTables(
+        categoryType: widget.categoryType,
+      );
       if (!mounted) return;
       setState(() {
         _tables = tables;
@@ -286,10 +265,7 @@ class _BillingPageState extends State<BillingPage> {
 
       try {
         if (!await bookWithApproval()) return;
-      } on BookingWarningException catch (w) {
-        if (!mounted) return;
-        final proceed = await _confirmBookingWarning(table, w.warnings);
-        if (proceed != true) return;
+      } on BookingWarningException {
         if (!await bookWithApproval(ignoreBookingWarning: true)) return;
       }
 
@@ -299,8 +275,37 @@ class _BillingPageState extends State<BillingPage> {
       await _loadTables();
     } on BillingRepositoryException catch (e) {
       if (!mounted) return;
-      AppToast.error(context, e.message);
+      _showBookingErrorDialog(e.message);
     }
+  }
+
+  // meja gagal dibuka (mis. kombinasi mode + promo tidak valid) - pakai modal, bukan toast,
+  // supaya kasir tidak melewatkannya dan mengira meja sudah kebuka padahal belum.
+  void _showBookingErrorDialog(String message) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSizes.radiusLarge),
+        ),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline_rounded, color: AppColors.danger),
+            const SizedBox(width: 10),
+            Text("Meja Tidak Dibuka", style: AppText.title),
+          ],
+        ),
+        content: Text(message, style: AppText.bodySecondary),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text("OK"),
+          ),
+        ],
+      ),
+    );
   }
 
   String _bookingApprovalMessage(MemberApprovalOutcome? o) {
@@ -314,61 +319,6 @@ class _BillingPageState extends State<BillingPage> {
       default:
         return "Konfirmasi PIN member gagal — meja tidak dibuka";
     }
-  }
-
-  Future<bool?> _confirmBookingWarning(PoolTable table, List<String> warnings) {
-    return showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.card,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppSizes.radiusLarge),
-        ),
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.warning_amber_rounded, color: AppColors.warning),
-            const SizedBox(width: 10),
-            Text("Perlu Diperhatikan", style: AppText.title),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (final w in warnings) ...[
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text("•  "),
-                  Expanded(child: Text(w, style: AppText.bodySecondary)),
-                ],
-              ),
-              const SizedBox(height: 8),
-            ],
-            const SizedBox(height: 4),
-            Text(
-              "Tetap buka ${table.name}?",
-              style: AppText.body.copyWith(fontWeight: FontWeight.w600),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text("Batal"),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.warning,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text("Tetap Buka"),
-          ),
-        ],
-      ),
-    );
   }
 
   void _replaceTable(PoolTable updated) {
@@ -394,7 +344,6 @@ class _BillingPageState extends State<BillingPage> {
       context,
       "Pembayaran ${table.name} sebesar ${formatCurrency(result.total)} berhasil via ${result.paymentMethod}",
     );
-    _loadCashierSummary();
 
     try {
       final session = await _sessionStorage.getSession();
@@ -563,9 +512,9 @@ class _BillingPageState extends State<BillingPage> {
   @override
   Widget build(BuildContext context) {
     return AppLayout(
-      title: "Billing",
+      title: widget.pageTitle,
       showSearch: false,
-      activeMenuKey: "meja",
+      activeMenuKey: widget.menuKey,
       onMenuSelect: (key) => navigateToMenu(context, key),
       onRefresh: _refreshAll,
       child: _buildBody(),
@@ -584,11 +533,6 @@ class _BillingPageState extends State<BillingPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (_isOwner) ...[
-            _buildStatsRow(),
-            const SizedBox(height: 16),
-          ],
-
           _buildStatusHeader(),
 
           const SizedBox(height: 16),
@@ -645,46 +589,6 @@ class _BillingPageState extends State<BillingPage> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildStatsRow() {
-    final billing = _cashierSummary?.billing ?? CashierTransactionSummary.empty;
-    final cafe = _cashierSummary?.cafe ?? CashierTransactionSummary.empty;
-    final saldo = _cashierSummary?.saldo ?? CashierTransactionSummary.empty;
-
-    return Row(
-      children: [
-        Expanded(
-          child: StatCard(
-            icon: Icons.table_bar_rounded,
-            color: AppColors.primary,
-            label: "Rincian Transaksi Billing",
-            value: formatCurrency(billing.totalTransaction),
-            subtitle: "${billing.invoiceCount} nota hari ini",
-          ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: StatCard(
-            icon: Icons.local_cafe_rounded,
-            color: AppColors.success,
-            label: "Rincian Transaksi Cafe",
-            value: formatCurrency(cafe.totalTransaction),
-            subtitle: "${cafe.invoiceCount} nota hari ini",
-          ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: StatCard(
-            icon: Icons.savings_outlined,
-            color: AppColors.info,
-            label: "Total Transaksi Saldo",
-            value: formatCurrency(saldo.totalTransaction),
-            subtitle: "${saldo.invoiceCount} nota hari ini",
-          ),
-        ),
-      ],
     );
   }
 

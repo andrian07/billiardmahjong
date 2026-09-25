@@ -21,7 +21,7 @@ import '../data/role_repository.dart';
 // to everyone) are deliberately excluded too, since none is actually
 // role-gated.
 const _sidebarMenuOrder = <String>[
-  'meja', 'pos', 'transaksi',
+  'meja', 'mahjong', 'pos', 'transaksi',
   'master_member', 'master_pengguna', 'master_role', 'master_promo',
   'produk', 'pembelian', 'unit', 'kategori',
   'Laporan',
@@ -29,7 +29,8 @@ const _sidebarMenuOrder = <String>[
 ];
 
 const _sidebarMenuLabels = <String, String>{
-  'meja': 'Meja',
+  'meja': 'Billing',
+  'mahjong': 'Mahjong',
   'pos': 'POS',
   'transaksi': 'Transaksi',
   'master_member': 'Member',

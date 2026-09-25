@@ -31,6 +31,8 @@ class ApiEndpoints {
   // Master price
   static const String priceList = "$baseUrl/Master/price_list";
   static const String editPrice = "$baseUrl/Master/edit_price";
+  static const String priceListMahjong = "$baseUrl/Master/price_list_mahjong";
+  static const String editPriceMahjong = "$baseUrl/Master/edit_price_mahjong";
 
   // Master promo
   static const String promoList = "$baseUrl/Master/promo_list";
@@ -104,6 +106,7 @@ class ApiEndpoints {
   static const String cancelTable = "$baseUrl/Billing/cancel_table";
   static const String editPaymentTransaction =
       "$baseUrl/Billing/edit_payment_transaction";
+  static const String cancelTransaction = "$baseUrl/Billing/cancel_transaction";
   static const String transactionList = "$baseUrl/Billing/transaction_list";
   static const String transactionDetail = "$baseUrl/Billing/transaction_detail";
   static const String settingTable = "$baseUrl/Billing/setting_table";

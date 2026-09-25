@@ -366,7 +366,7 @@ class _TableSettingRow extends StatelessWidget {
     return _row(
       no: Text("$no", style: cellStyle.copyWith(color: AppColors.textHint)),
       number: Text(
-        "Meja ${t.number}",
+        t.number,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: cellStyle.copyWith(fontWeight: FontWeight.w600),

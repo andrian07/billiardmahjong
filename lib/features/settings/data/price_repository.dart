@@ -15,11 +15,18 @@ class PriceRepositoryException implements Exception {
 }
 
 /// Reads and updates hourly price settings via the Master/*_price endpoints.
+/// [mahjong] switches to the Master/*_price_mahjong endpoints, which read
+/// and write the separate ms_master_price_mahjong table on the backend —
+/// same shape, independent data from the billiard price table.
 class PriceRepository {
   final Dio _dio = Dio();
+  final bool mahjong;
+
+  PriceRepository({this.mahjong = false});
 
   Future<List<PriceSetting>> getPrices() async {
-    final data = await _post(ApiEndpoints.priceList, const {});
+    final url = mahjong ? ApiEndpoints.priceListMahjong : ApiEndpoints.priceList;
+    final data = await _post(url, const {});
 
     final list = data['data'];
     if (list is! List) {
@@ -42,7 +49,8 @@ class PriceRepository {
     required int price4,
     required int price5,
   }) {
-    return _post(ApiEndpoints.editPrice, {
+    final url = mahjong ? ApiEndpoints.editPriceMahjong : ApiEndpoints.editPrice;
+    return _post(url, {
       "master_price_id": "$id",
       "price": "$price",
       "price_2": "$price2",

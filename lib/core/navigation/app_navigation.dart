@@ -10,6 +10,7 @@ import '../../services/topup_watcher.dart';
 
 const _routesByKey = {
   'meja': '/meja',
+  'mahjong': '/mahjong',
   'pos': '/pos',
   'transaksi': '/transaksi',
   'booking': '/booking',

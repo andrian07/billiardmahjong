@@ -9,6 +9,10 @@ class PoolTable {
   final String name;
   final TableStatus status;
   final int? categoryMejaId;
+
+  /// 'billiard' or 'mahjong' — which sidebar page (Billing vs Mahjong) this
+  /// table belongs to, resolved server-side from its category_meja_type.
+  final String categoryType;
   final String? badge;
   final String? startTime;
   final String? timerText;
@@ -35,6 +39,7 @@ class PoolTable {
     required this.name,
     required this.status,
     this.categoryMejaId,
+    this.categoryType = "billiard",
     this.badge,
     this.startTime,
     this.timerText,

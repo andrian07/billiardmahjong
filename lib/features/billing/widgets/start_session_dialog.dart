@@ -151,11 +151,14 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
       (_useSavedTime != true || _habiskanTimer == false) &&
       !_promoLocksDuration;
 
-  /// True when the selected promo has a valid-hour window — such promos can
-  /// only be used with mode Timer (see Billing_model::validate_promo_schedule
-  /// on the backend), since a Reguler session has no known end time up front
-  /// to check against the window.
-  bool get _promoRequiresTimer => _selectedPromo?.hasTimeWindow ?? false;
+  /// True when the selected promo can only be used with mode Timer: either it
+  /// has a valid-hour window (see Billing_model::validate_promo_schedule on
+  /// the backend), or it's a fixed price+duration package (type Fix) - a
+  /// Reguler session has no fixed/known end time up front, so it can't be
+  /// matched against a promo window or billed at a flat package price.
+  bool get _promoRequiresTimer =>
+      (_selectedPromo?.hasTimeWindow ?? false) ||
+      _selectedPromo?.type == PromoType.fixed;
 
   void _selectPromo(Promo? promo) {
     if (promo != null && promo.hasDayRestriction) {

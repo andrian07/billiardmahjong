@@ -112,6 +112,7 @@ class _TableCategoryDialogState extends State<TableCategoryDialog> {
       final categoryId = await _repository.addTableCategory(
         name: result.name,
         priceOption: result.priceOption,
+        type: result.type,
       );
       await _assignTablesToCategory(categoryId, result.selectedTableIds);
       if (!mounted) return;
@@ -136,6 +137,7 @@ class _TableCategoryDialogState extends State<TableCategoryDialog> {
         name: result.name,
         active: result.active,
         priceOption: result.priceOption,
+        type: result.type,
       );
       await _assignTablesToCategory(category.id, result.selectedTableIds);
       if (!mounted) return;

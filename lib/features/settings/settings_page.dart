@@ -49,6 +49,11 @@ String _formatHourRange(int hour) {
   return "${two(hour)}:00-${two(next)}:00";
 }
 
+/// "Harga Meja" — 2 tab independen (Harga Billiard / Harga Mahjong), masing-masing
+/// baca/tulis tabel harga sendiri di backend (ms_master_price vs
+/// ms_master_price_mahjong, lihat PriceRepository). Tab shell di sini cuma
+/// urus AppLayout + toolbar bersama (judul, tombol Pilih Printer) + TabBar;
+/// semua state harga (load/edit/tampil) ada di [_PriceTab].
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 
@@ -56,8 +61,143 @@ class SettingsPage extends StatefulWidget {
   State<SettingsPage> createState() => _SettingsPageState();
 }
 
-class _SettingsPageState extends State<SettingsPage> {
-  final _repository = PriceRepository();
+class _SettingsPageState extends State<SettingsPage>
+    with SingleTickerProviderStateMixin {
+  late final _tabController = TabController(length: 2, vsync: this);
+  final _billiardTabKey = GlobalKey<_PriceTabState>();
+  final _mahjongTabKey = GlobalKey<_PriceTabState>();
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _refreshAll() {
+    _billiardTabKey.currentState?.load();
+    _mahjongTabKey.currentState?.load();
+  }
+
+  void _openPrinterSelectDialog() {
+    showDialog(context: context, builder: (_) => const PrinterSelectDialog());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppLayout(
+      title: "Pengaturan",
+      subtitle: "Kelola harga sewa meja per jam",
+      showSearch: false,
+      activeMenuKey: "pengaturan",
+      onMenuSelect: (key) => navigateToMenu(context, key),
+      onRefresh: _refreshAll,
+      child: _buildCard(),
+    );
+  }
+
+  Widget _buildCard() {
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+            child: _buildToolbar(),
+          ),
+          const Divider(height: 1, color: AppColors.divider),
+          TabBar(
+            controller: _tabController,
+            labelColor: AppColors.primary,
+            unselectedLabelColor: AppColors.textSecondary,
+            indicatorColor: AppColors.primary,
+            tabs: const [
+              Tab(text: "Harga Billiard"),
+              Tab(text: "Harga Mahjong"),
+            ],
+          ),
+          const Divider(height: 1, color: AppColors.divider),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _PriceTab(key: _billiardTabKey, mahjong: false),
+                _PriceTab(key: _mahjongTabKey, mahjong: true),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildToolbar() {
+    return Row(
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: .15),
+            borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+          ),
+          child: const Icon(
+            Icons.sell_outlined,
+            color: AppColors.primary,
+            size: 22,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                "Pengaturan Harga",
+                style: AppText.title.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                "Harga sewa meja per jam, per kategori (billiard/mahjong)",
+                style: AppText.caption,
+              ),
+            ],
+          ),
+        ),
+        OutlinedButton.icon(
+          onPressed: _openPrinterSelectDialog,
+          icon: const Icon(Icons.print_outlined, size: 18),
+          label: const Text("Pilih Printer"),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.textSecondary,
+            side: const BorderSide(color: AppColors.border),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// One tab's worth of price-editing state — everything SettingsPage used to
+/// own directly, now parametrized by [mahjong] so the Billiard and Mahjong
+/// tabs each get their own independent PriceRepository/data/loading state.
+class _PriceTab extends StatefulWidget {
+  final bool mahjong;
+
+  const _PriceTab({super.key, required this.mahjong});
+
+  @override
+  State<_PriceTab> createState() => _PriceTabState();
+}
+
+class _PriceTabState extends State<_PriceTab>
+    with AutomaticKeepAliveClientMixin {
+  late final _repository = PriceRepository(mahjong: widget.mahjong);
 
   List<PriceSetting> _prices = [];
   bool _loading = true;
@@ -65,12 +205,15 @@ class _SettingsPageState extends State<SettingsPage> {
   final Set<String> _expandedDays = {_dayOrder.first};
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   void initState() {
     super.initState();
-    _load();
+    load();
   }
 
-  Future<void> _load() async {
+  Future<void> load() async {
     setState(() {
       _loading = true;
       _error = null;
@@ -146,93 +289,10 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  void _openPrinterSelectDialog() {
-    showDialog(context: context, builder: (_) => const PrinterSelectDialog());
-  }
-
   @override
   Widget build(BuildContext context) {
-    return AppLayout(
-      title: "Pengaturan",
-      subtitle: "Kelola harga sewa meja per jam",
-      showSearch: false,
-      activeMenuKey: "pengaturan",
-      onMenuSelect: (key) => navigateToMenu(context, key),
-      onRefresh: _load,
-      child: _buildCard(),
-    );
-  }
-
-  Widget _buildCard() {
-    return AppCard(
-      padding: EdgeInsets.zero,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
-            child: _buildToolbar(),
-          ),
-          const Divider(height: 1, color: AppColors.divider),
-          Expanded(child: _buildBody()),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildToolbar() {
-    return Row(
-      children: [
-        Container(
-          width: 42,
-          height: 42,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: .15),
-            borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-          ),
-          child: const Icon(
-            Icons.sell_outlined,
-            color: AppColors.primary,
-            size: 22,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                "Pengaturan Harga",
-                style: AppText.title.copyWith(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                _loading
-                    ? "Memuat data..."
-                    : _error != null
-                    ? "Gagal memuat data"
-                    : "${_prices.length} slot jam • ${_dayOrder.length} hari",
-                style: AppText.caption,
-              ),
-            ],
-          ),
-        ),
-        OutlinedButton.icon(
-          onPressed: _openPrinterSelectDialog,
-          icon: const Icon(Icons.print_outlined, size: 18),
-          label: const Text("Pilih Printer"),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: AppColors.textSecondary,
-            side: const BorderSide(color: AppColors.border),
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-            ),
-          ),
-        ),
-      ],
-    );
+    super.build(context);
+    return _buildBody();
   }
 
   Widget _buildBody() {
@@ -342,7 +402,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 16),
           OutlinedButton.icon(
-            onPressed: _load,
+            onPressed: load,
             icon: const Icon(Icons.refresh_rounded, size: 18),
             label: const Text("Coba Lagi"),
             style: OutlinedButton.styleFrom(
