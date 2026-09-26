@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import 'package:billiard_billing/core/theme/app_theme.dart';
-import 'package:billiard_billing/features/billing/widgets/payment_dialog.dart';
-import 'package:billiard_billing/models/pool_table.dart';
+import 'package:mahjong_billiard_billing/core/theme/app_theme.dart';
+import 'package:mahjong_billiard_billing/features/billing/widgets/payment_dialog.dart';
+import 'package:mahjong_billiard_billing/models/pool_table.dart';
 
 void main() {
   runApp(const PreviewApp());
