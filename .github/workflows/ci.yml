@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.6"
+          channel: "stable"
+
+      - run: flutter pub get
+
+      # --no-fatal-infos: gagalkan build hanya kalau ada warning/error, bukan sekadar info lint
+      - run: flutter analyze --no-fatal-infos
+
+      - run: flutter test
