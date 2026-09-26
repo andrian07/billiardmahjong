@@ -35,17 +35,17 @@ jobs:
       - name: Zip build output
         shell: pwsh
         run: |
-          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath billinggameon-windows.zip
+          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath mahjong-billiard-windows.zip
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: billinggameon-windows
-          path: billinggameon-windows.zip
+          name: mahjong-billiard-windows
+          path: mahjong-billiard-windows.zip
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: billinggameon-windows.zip
+          files: mahjong-billiard-windows.zip
           generate_release_notes: true
