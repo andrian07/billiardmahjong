@@ -456,7 +456,7 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
       backgroundColor: AppColors.card,
       insetPadding: const EdgeInsets.all(24),
       child: Container(
-        width: _isMahjong ? 760 : 420,
+        width: _isMahjong ? 860 : 420,
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(AppSizes.radiusXL),
