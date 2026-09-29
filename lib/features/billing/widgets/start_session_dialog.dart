@@ -456,7 +456,7 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
       backgroundColor: AppColors.card,
       insetPadding: const EdgeInsets.all(24),
       child: Container(
-        width: _isMahjong ? 640 : 420,
+        width: _isMahjong ? 760 : 420,
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(AppSizes.radiusXL),
@@ -754,6 +754,17 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
               decoration: _inputDecoration(
                 hint: "Pemain ${i + 1} - cari nama / no. HP member",
                 prefixIcon: Icons.person_outline_rounded,
+                suffixIcon: _selectedPlayers[i] != null
+                    ? IconButton(
+                        tooltip: "Batalkan pemain ${i + 1}",
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                        color: AppColors.textSecondary,
+                        onPressed: () {
+                          controller.clear();
+                          _selectPlayer(i, null);
+                        },
+                      )
+                    : null,
               ),
               onChanged: (_) => _selectPlayer(i, null),
             );
@@ -1224,6 +1235,7 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
     String? hint,
     String? errorText,
     IconData? prefixIcon,
+    Widget? suffixIcon,
   }) {
     return InputDecoration(
       hintText: hint,
@@ -1232,6 +1244,7 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
       prefixIcon: prefixIcon != null
           ? Icon(prefixIcon, size: 20, color: AppColors.textSecondary)
           : null,
+      suffixIcon: suffixIcon,
       filled: true,
       fillColor: AppColors.background,
       isDense: true,
