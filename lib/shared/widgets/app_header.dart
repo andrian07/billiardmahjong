@@ -9,8 +9,10 @@ import '../../features/billing/data/billing_repository.dart';
 import '../../features/cashier/widgets/expense_dialog.dart';
 import '../../features/cashier/widgets/tutup_kas_dialog.dart';
 import '../../features/topup/widgets/topup_requests_dialog.dart';
+import '../../models/pool_table.dart';
 import '../../services/booking_watcher.dart';
 import '../../services/session_storage.dart';
+import '../../services/timer_expiry_watcher.dart';
 import '../../services/topup_watcher.dart';
 import 'app_toast.dart';
 
@@ -36,10 +38,47 @@ class _AppHeaderState extends State<AppHeader> {
   String _username = "";
   String _roleName = "";
 
+  // Diffed against TimerExpiryWatcher.instance.expiredTables on every tick
+  // so a toast only fires for a table that JUST expired, not for ones that
+  // were already expired before this AppHeader instance mounted (e.g. after
+  // navigating to a different page) - see _onExpiredTablesChanged below.
+  Set<String> _seenExpiredIds = {};
+
   @override
   void initState() {
     super.initState();
     _loadSession();
+    _seenExpiredIds = TimerExpiryWatcher.instance.expiredTables.value
+        .map((t) => t.id)
+        .toSet();
+    TimerExpiryWatcher.instance.expiredTables.addListener(
+      _onExpiredTablesChanged,
+    );
+  }
+
+  @override
+  void dispose() {
+    TimerExpiryWatcher.instance.expiredTables.removeListener(
+      _onExpiredTablesChanged,
+    );
+    super.dispose();
+  }
+
+  void _onExpiredTablesChanged() {
+    final tables = TimerExpiryWatcher.instance.expiredTables.value;
+    final newlyExpired = tables
+        .where((t) => !_seenExpiredIds.contains(t.id))
+        .toList();
+    _seenExpiredIds = tables.map((t) => t.id).toSet();
+    if (newlyExpired.isEmpty || !mounted) return;
+
+    for (final table in newlyExpired) {
+      final pageLabel = table.categoryType == "mahjong" ? "Mahjong" : "Billing";
+      AppToast.error(
+        context,
+        "Waktu ${table.name} ($pageLabel) sudah habis!",
+      );
+    }
   }
 
   Future<void> _loadSession() async {
@@ -190,6 +229,33 @@ class _AppHeaderState extends State<AppHeader> {
 
           const SizedBox(width: 8),
 
+          ValueListenableBuilder<List<PoolTable>>(
+            valueListenable: TimerExpiryWatcher.instance.expiredTables,
+            builder: (context, tables, _) {
+              return IconButton(
+                tooltip: tables.isEmpty
+                    ? "Tidak ada meja timer habis"
+                    : "${tables.length} meja timer habis",
+                onPressed: tables.isEmpty
+                    ? null
+                    : () => _openExpiredTables(context, tables),
+                icon: Badge(
+                  isLabelVisible: tables.isNotEmpty,
+                  label: Text("${tables.length}"),
+                  backgroundColor: AppColors.danger,
+                  child: Icon(
+                    Icons.alarm_rounded,
+                    color: tables.isNotEmpty
+                        ? AppColors.danger
+                        : AppColors.textSecondary,
+                  ),
+                ),
+              );
+            },
+          ),
+
+          const SizedBox(width: 8),
+
           IconButton(
             tooltip: "Reset Lampu",
             onPressed: () => _resetLampu(context),
@@ -232,6 +298,69 @@ class _AppHeaderState extends State<AppHeader> {
     showDialog(
       context: context,
       builder: (_) => const TopupRequestsDialog(),
+    );
+  }
+
+  void _openExpiredTables(BuildContext context, List<PoolTable> tables) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSizes.radiusLarge),
+        ),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.alarm_rounded, color: AppColors.danger),
+            const SizedBox(width: 10),
+            Text("Timer Habis (${tables.length})", style: AppText.title),
+          ],
+        ),
+        content: SizedBox(
+          width: 320,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 320),
+            child: ListView.separated(
+              shrinkWrap: true,
+              itemCount: tables.length,
+              separatorBuilder: (_, _) =>
+                  const Divider(height: 1, color: AppColors.divider),
+              itemBuilder: (context, index) {
+                final table = tables[index];
+                final isMahjong = table.categoryType == "mahjong";
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    isMahjong
+                        ? Icons.casino_outlined
+                        : Icons.table_bar_rounded,
+                    color: AppColors.danger,
+                  ),
+                  title: Text(
+                    table.name,
+                    style: AppText.body.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    isMahjong ? "Mahjong" : "Billing",
+                    style: AppText.caption,
+                  ),
+                  onTap: () {
+                    Navigator.of(dialogContext).pop();
+                    context.go(isMahjong ? '/mahjong' : '/meja');
+                  },
+                );
+              },
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text("TUTUP"),
+          ),
+        ],
+      ),
     );
   }
 

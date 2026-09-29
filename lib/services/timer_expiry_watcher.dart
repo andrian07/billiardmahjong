@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 import '../features/billing/data/billing_repository.dart';
 import '../features/billing/data/table_repository.dart';
 import '../models/pool_table.dart';
@@ -28,6 +30,13 @@ class TimerExpiryWatcher {
   Timer? _timer;
   bool _checking = false;
 
+  /// Tables currently sitting in an expired-Timer state, refreshed every
+  /// tick — drives the alarm badge in AppHeader (see app_header.dart) so a
+  /// cashier notices regardless of which page (Billing, Mahjong, POS, ...)
+  /// they're currently on, since a billiard table's relay light is the only
+  /// other cue and mahjong tables don't even have one (relay_number = 0).
+  final expiredTables = ValueNotifier<List<PoolTable>>(const []);
+
   // Tables already signaled for their *current* expiry, so a slow/offline
   // tick doesn't re-signal the same expiry repeatedly. Cleared per table as
   // soon as it's no longer sitting in an expired-Timer state (paid,
@@ -44,6 +53,7 @@ class TimerExpiryWatcher {
     _timer?.cancel();
     _timer = null;
     _notifiedTableIds.clear();
+    expiredTables.value = const [];
   }
 
   Future<void> _check() async {
@@ -56,6 +66,7 @@ class TimerExpiryWatcher {
       final tables = await _tableRepository.getTables();
       final now = DateTime.now();
       final currentlyExpired = <String>{};
+      final expiredList = <PoolTable>[];
 
       for (final table in tables) {
         final isExpiredTimer =
@@ -66,6 +77,7 @@ class TimerExpiryWatcher {
         if (!isExpiredTimer) continue;
 
         currentlyExpired.add(table.id);
+        expiredList.add(table);
         if (_notifiedTableIds.contains(table.id)) continue;
 
         try {
@@ -77,6 +89,7 @@ class TimerExpiryWatcher {
       }
 
       _notifiedTableIds.retainWhere(currentlyExpired.contains);
+      expiredTables.value = expiredList;
     } catch (_) {
       // Table list fetch failed (offline, server hiccup, ...) — try again
       // on the next tick.
