@@ -20,6 +20,11 @@ class StartSessionResult {
   final SessionType sessionType;
   final int? customerId;
   final String? memberName;
+
+  /// Nama pemain (maks 4, dipisah ", ") - khusus meja mahjong, lihat
+  /// [PoolTable.players]. Beda dari [memberName]: bebas, tidak perlu
+  /// terdaftar sebagai member.
+  final String? players;
   final int? promoId;
   final String? promo;
   final Duration? duration;
@@ -32,6 +37,7 @@ class StartSessionResult {
     required this.sessionType,
     this.customerId,
     this.memberName,
+    this.players,
     this.promoId,
     this.promo,
     this.duration,
@@ -77,6 +83,11 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
   late final _minuteController = TextEditingController(
     text: "$_durationMinutes",
   );
+
+  /// Nama pemain (maks 4) - cuma dipakai/ditampilkan untuk meja mahjong,
+  /// lihat [_isMahjong] dan StartSessionResult.players.
+  bool get _isMahjong => widget.table.categoryType == "mahjong";
+  final _playerControllers = List.generate(4, (_) => TextEditingController());
 
   bool _loading = true;
   String? _loadError;
@@ -132,6 +143,9 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
   void dispose() {
     _hourController.dispose();
     _minuteController.dispose();
+    for (final c in _playerControllers) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -331,11 +345,19 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
       }
     }
 
+    final players = _isMahjong
+        ? _playerControllers
+              .map((c) => c.text.trim())
+              .where((name) => name.isNotEmpty)
+              .join(", ")
+        : "";
+
     Navigator.of(context).pop(
       StartSessionResult(
         sessionType: _sessionType,
         customerId: _selectedCustomer?.id,
         memberName: _selectedCustomer?.name,
+        players: players.isNotEmpty ? players : null,
         promoId: _selectedPromo?.id,
         promo: _selectedPromo?.name,
         duration: isTimer ? duration : null,
@@ -483,6 +505,23 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
               );
             },
           ),
+
+          if (_isMahjong) ...[
+            const SizedBox(height: 20),
+            _label("Nama Pemain (Opsional, maks 4)"),
+            const SizedBox(height: 8),
+            for (var i = 0; i < _playerControllers.length; i++) ...[
+              if (i > 0) const SizedBox(height: 8),
+              TextField(
+                controller: _playerControllers[i],
+                style: AppText.body,
+                decoration: _inputDecoration(
+                  hint: "Pemain ${i + 1}",
+                  prefixIcon: Icons.person_outline_rounded,
+                ),
+              ),
+            ],
+          ],
 
           if (_checkingSavedTime) ...[
             const SizedBox(height: 14),

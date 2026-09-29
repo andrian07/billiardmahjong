@@ -223,6 +223,7 @@ class _BillingPageState extends State<BillingPage> {
           mode: result.sessionType,
           startTime: now,
           customerId: result.customerId,
+          players: result.players,
           promoId: result.promoId,
           endTime: endAt,
           duration: result.duration,

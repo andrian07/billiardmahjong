@@ -20,6 +20,11 @@ class PoolTable {
   final SessionType? sessionType;
   final int? customerId;
   final String? memberName;
+
+  /// Free-text player names (comma-separated, up to 4) — mahjong-specific,
+  /// separate from [memberName] which is a single registered member tied to
+  /// loyalty points/saldo. See table_active.table_players on the backend.
+  final String? players;
   final int? promoId;
   final String? promoName;
   final PromoType? promoType;
@@ -47,6 +52,7 @@ class PoolTable {
     this.sessionType,
     this.customerId,
     this.memberName,
+    this.players,
     this.promoId,
     this.promoName,
     this.promoType,
@@ -74,6 +80,7 @@ class PoolTable {
     SessionType? sessionType,
     int? customerId,
     String? memberName,
+    String? players,
     int? promoId,
     String? promoName,
     PromoType? promoType,
@@ -90,6 +97,7 @@ class PoolTable {
       name: name,
       status: status ?? this.status,
       categoryMejaId: categoryMejaId,
+      categoryType: categoryType,
       badge: badge ?? this.badge,
       startTime: startTime ?? this.startTime,
       timerText: timerText ?? this.timerText,
@@ -97,6 +105,7 @@ class PoolTable {
       sessionType: sessionType ?? this.sessionType,
       customerId: customerId ?? this.customerId,
       memberName: memberName ?? this.memberName,
+      players: players ?? this.players,
       promoId: promoId ?? this.promoId,
       promoName: promoName ?? this.promoName,
       promoType: promoType ?? this.promoType,

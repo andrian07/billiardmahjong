@@ -125,6 +125,9 @@ class TableRepository {
       memberName: (memberName != null && memberName.trim().isNotEmpty)
           ? memberName
           : null,
+      players: (json['table_players']?.toString().trim().isNotEmpty ?? false)
+          ? json['table_players'].toString().trim()
+          : null,
       promoId: (promoId != null && promoId != 0) ? promoId : null,
       promoName: promo?.name,
       promoType: promo?.type,
