@@ -97,6 +97,11 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
     4,
     (_) => TextEditingController(),
   );
+  // Autocomplete's assertion requires textEditingController and focusNode to
+  // be supplied together (both null or both set) - see the widget's own
+  // fieldViewBuilder-provided focusNode can't be reused here since it's only
+  // handed to us inside the builder, after the widget's already built.
+  final _playerFocusNodes = List.generate(4, (_) => FocusNode());
 
   /// customer_id yang sedang aktif di meja LAIN (billiard maupun mahjong) -
   /// baik sebagai member utama maupun sebagai salah satu pemain mahjong di
@@ -184,6 +189,9 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
     _minuteController.dispose();
     for (final c in _playerFieldControllers) {
       c.dispose();
+    }
+    for (final f in _playerFocusNodes) {
+      f.dispose();
     }
     super.dispose();
   }
@@ -589,6 +597,7 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
               Autocomplete<Customer>(
                 key: ValueKey('player_$i'),
                 textEditingController: _playerFieldControllers[i],
+                focusNode: _playerFocusNodes[i],
                 displayStringForOption: (customer) => customer.name,
                 optionsBuilder: (textEditingValue) {
                   final query = textEditingValue.text.toLowerCase();
