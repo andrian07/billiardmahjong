@@ -14,6 +14,7 @@ import '../../../shared/widgets/app_toast.dart';
 import '../../customer/data/customer_repository.dart';
 import '../../promo/data/promo_repository.dart';
 import '../data/billing_repository.dart';
+import '../data/table_repository.dart';
 import 'member_time_history_dialog.dart';
 
 class StartSessionResult {
@@ -21,10 +22,11 @@ class StartSessionResult {
   final int? customerId;
   final String? memberName;
 
-  /// Nama pemain (maks 4, dipisah ", ") - khusus meja mahjong, lihat
-  /// [PoolTable.players]. Beda dari [memberName]: bebas, tidak perlu
-  /// terdaftar sebagai member.
-  final String? players;
+  /// customer_id pemain (maks 4, dipisah koma) - khusus meja mahjong, harus
+  /// member terdaftar (lihat [PoolTable.playerIds]). Beda dari [memberName]:
+  /// backend menolak kalau ada duplikat atau member itu sedang aktif di
+  /// meja lain (lihat Billing_model::resolve_players).
+  final String? playerIds;
   final int? promoId;
   final String? promo;
   final Duration? duration;
@@ -37,7 +39,7 @@ class StartSessionResult {
     required this.sessionType,
     this.customerId,
     this.memberName,
-    this.players,
+    this.playerIds,
     this.promoId,
     this.promo,
     this.duration,
@@ -84,10 +86,25 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
     text: "$_durationMinutes",
   );
 
-  /// Nama pemain (maks 4) - cuma dipakai/ditampilkan untuk meja mahjong,
-  /// lihat [_isMahjong] dan StartSessionResult.players.
+  /// Pemain (maks 4, harus member terdaftar) - cuma dipakai/ditampilkan
+  /// untuk meja mahjong, lihat [_isMahjong] dan StartSessionResult.playerIds.
+  /// Tiap slot Autocomplete-nya punya controller sendiri supaya bisa
+  /// di-clear programatis kalau pilihannya ditolak (duplikat / sedang aktif
+  /// di meja lain - lihat _selectPlayer).
   bool get _isMahjong => widget.table.categoryType == "mahjong";
-  final _playerControllers = List.generate(4, (_) => TextEditingController());
+  final _selectedPlayers = List<Customer?>.filled(4, null);
+  final _playerFieldControllers = List.generate(
+    4,
+    (_) => TextEditingController(),
+  );
+
+  /// customer_id yang sedang aktif di meja LAIN (billiard maupun mahjong) -
+  /// baik sebagai member utama maupun sebagai salah satu pemain mahjong di
+  /// meja itu. Dimuat sekali di _loadOptions() khusus untuk meja mahjong,
+  /// dipakai _selectPlayer() supaya "1 member 1 meja" sudah dicegah dari UI
+  /// (backend tetap validasi ulang sebagai source of truth, lihat
+  /// Billing_model::resolve_players).
+  Set<int> _occupiedElsewhere = {};
 
   bool _loading = true;
   String? _loadError;
@@ -124,10 +141,32 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
         page: 1,
         perPage: 1000,
       );
+      // "1 member 1 meja": UI-side hint - cek meja mana saja yang lagi aktif
+      // (semua kategori, bukan cuma mahjong) supaya member yang sudah main
+      // di tempat lain tidak bisa dipilih lagi di sini. Backend tetap jadi
+      // source of truth (lihat Billing_model::resolve_players), ini cuma
+      // supaya kasir langsung tahu tanpa perlu submit dulu.
+      var occupied = <int>{};
+      if (_isMahjong) {
+        try {
+          final allTables = await TableRepository().getTables();
+          for (final t in allTables) {
+            if (t.id == widget.table.id || t.status != TableStatus.playing) {
+              continue;
+            }
+            if (t.customerId != null) occupied.add(t.customerId!);
+            occupied.addAll(t.playerIdList);
+          }
+        } catch (_) {
+          // Best-effort - gagal ambil daftar meja lain tidak boleh
+          // menggagalkan seluruh dialog, backend tetap validasi ulang.
+        }
+      }
       if (!mounted) return;
       setState(() {
         _customers = customerResult.customers;
         _promos = promoResult.promos;
+        _occupiedElsewhere = occupied;
         _loading = false;
       });
     } catch (_) {
@@ -143,7 +182,7 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
   void dispose() {
     _hourController.dispose();
     _minuteController.dispose();
-    for (final c in _playerControllers) {
+    for (final c in _playerFieldControllers) {
       c.dispose();
     }
     super.dispose();
@@ -229,6 +268,39 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
   String get _savedTimeErrorText =>
       "Durasi tidak boleh melebihi sisa waktu tersimpan "
       "(${formatDuration(_savedTime!.timeRemaining)})";
+
+  /// Menolak (dan clear field-nya lagi) kalau member yang dipilih sudah ada
+  /// di slot pemain lain di meja ini, atau sedang aktif di meja lain - lihat
+  /// _occupiedElsewhere. Backend tetap validasi ulang saat submit.
+  void _selectPlayer(int index, Customer? customer) {
+    if (customer == null) {
+      setState(() => _selectedPlayers[index] = null);
+      return;
+    }
+
+    final duplicateInThisTable = _selectedPlayers.asMap().entries.any(
+      (e) => e.key != index && e.value?.id == customer.id,
+    );
+    if (duplicateInThisTable) {
+      AppToast.error(
+        context,
+        "${customer.name} sudah dipilih sebagai pemain lain di meja ini.",
+      );
+      _playerFieldControllers[index].clear();
+      return;
+    }
+
+    if (_occupiedElsewhere.contains(customer.id)) {
+      AppToast.error(
+        context,
+        "${customer.name} sedang aktif di meja lain - 1 member cuma bisa main di 1 meja.",
+      );
+      _playerFieldControllers[index].clear();
+      return;
+    }
+
+    setState(() => _selectedPlayers[index] = customer);
+  }
 
   Future<void> _selectCustomer(Customer? customer) async {
     setState(() {
@@ -345,11 +417,11 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
       }
     }
 
-    final players = _isMahjong
-        ? _playerControllers
-              .map((c) => c.text.trim())
-              .where((name) => name.isNotEmpty)
-              .join(", ")
+    final playerIds = _isMahjong
+        ? _selectedPlayers
+              .whereType<Customer>()
+              .map((c) => "${c.id}")
+              .join(",")
         : "";
 
     Navigator.of(context).pop(
@@ -357,7 +429,7 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
         sessionType: _sessionType,
         customerId: _selectedCustomer?.id,
         memberName: _selectedCustomer?.name,
-        players: players.isNotEmpty ? players : null,
+        playerIds: playerIds.isNotEmpty ? playerIds : null,
         promoId: _selectedPromo?.id,
         promo: _selectedPromo?.name,
         duration: isTimer ? duration : null,
@@ -376,7 +448,7 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
       backgroundColor: AppColors.card,
       insetPadding: const EdgeInsets.all(24),
       child: Container(
-        width: 420,
+        width: _isMahjong ? 640 : 420,
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(AppSizes.radiusXL),
@@ -467,58 +539,96 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
             ],
           ),
 
-          const SizedBox(height: 20),
-          _label("Nama Member (Opsional)"),
-          const SizedBox(height: 8),
-          Autocomplete<Customer>(
-            displayStringForOption: (customer) => customer.name,
-            optionsBuilder: (textEditingValue) {
-              if (textEditingValue.text.isEmpty) return _customers;
-              final query = textEditingValue.text.toLowerCase();
-              return _customers.where(
-                (customer) =>
-                    customer.name.toLowerCase().contains(query) ||
-                    customer.phone.toLowerCase().contains(query),
-              );
-            },
-            onSelected: (customer) => _selectCustomer(customer),
-            fieldViewBuilder: (context, controller, focusNode, onSubmit) {
-              return TextField(
-                controller: controller,
-                focusNode: focusNode,
-                style: AppText.body,
-                decoration: _inputDecoration(
-                  hint: "Cari nama / no. HP member",
-                  prefixIcon: Icons.person_outline_rounded,
-                ),
-                onChanged: (_) => _selectCustomer(null),
-              );
-            },
-            optionsViewBuilder: (context, onSelected, options) {
-              return _buildOptionsCard<Customer>(
-                context,
-                options: options,
-                onSelected: onSelected,
-                labelOf: (customer) => customer.phone.trim().isEmpty
-                    ? customer.name
-                    : "${customer.name} (${customer.phone})",
-              );
-            },
-          ),
+          if (!_isMahjong) ...[
+            const SizedBox(height: 20),
+            _label("Nama Member (Opsional)"),
+            const SizedBox(height: 8),
+            Autocomplete<Customer>(
+              displayStringForOption: (customer) => customer.name,
+              optionsBuilder: (textEditingValue) {
+                if (textEditingValue.text.isEmpty) return _customers;
+                final query = textEditingValue.text.toLowerCase();
+                return _customers.where(
+                  (customer) =>
+                      customer.name.toLowerCase().contains(query) ||
+                      customer.phone.toLowerCase().contains(query),
+                );
+              },
+              onSelected: (customer) => _selectCustomer(customer),
+              fieldViewBuilder: (context, controller, focusNode, onSubmit) {
+                return TextField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  style: AppText.body,
+                  decoration: _inputDecoration(
+                    hint: "Cari nama / no. HP member",
+                    prefixIcon: Icons.person_outline_rounded,
+                  ),
+                  onChanged: (_) => _selectCustomer(null),
+                );
+              },
+              optionsViewBuilder: (context, onSelected, options) {
+                return _buildOptionsCard<Customer>(
+                  context,
+                  options: options,
+                  onSelected: onSelected,
+                  labelOf: (customer) => customer.phone.trim().isEmpty
+                      ? customer.name
+                      : "${customer.name} (${customer.phone})",
+                );
+              },
+            ),
+          ],
 
           if (_isMahjong) ...[
             const SizedBox(height: 20),
-            _label("Nama Pemain (Opsional, maks 4)"),
+            _label("Pemain (Opsional, maks 4, harus member terdaftar)"),
             const SizedBox(height: 8),
-            for (var i = 0; i < _playerControllers.length; i++) ...[
+            for (var i = 0; i < 4; i++) ...[
               if (i > 0) const SizedBox(height: 8),
-              TextField(
-                controller: _playerControllers[i],
-                style: AppText.body,
-                decoration: _inputDecoration(
-                  hint: "Pemain ${i + 1}",
-                  prefixIcon: Icons.person_outline_rounded,
-                ),
+              Autocomplete<Customer>(
+                key: ValueKey('player_$i'),
+                textEditingController: _playerFieldControllers[i],
+                displayStringForOption: (customer) => customer.name,
+                optionsBuilder: (textEditingValue) {
+                  final query = textEditingValue.text.toLowerCase();
+                  final takenIds = {
+                    ..._occupiedElsewhere,
+                    for (var j = 0; j < 4; j++)
+                      if (j != i && _selectedPlayers[j] != null)
+                        _selectedPlayers[j]!.id,
+                  };
+                  return _customers.where(
+                    (customer) =>
+                        !takenIds.contains(customer.id) &&
+                        (query.isEmpty ||
+                            customer.name.toLowerCase().contains(query) ||
+                            customer.phone.toLowerCase().contains(query)),
+                  );
+                },
+                onSelected: (customer) => _selectPlayer(i, customer),
+                fieldViewBuilder: (context, controller, focusNode, onSubmit) {
+                  return TextField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    style: AppText.body,
+                    decoration: _inputDecoration(
+                      hint: "Pemain ${i + 1} - cari nama / no. HP member",
+                      prefixIcon: Icons.person_outline_rounded,
+                    ),
+                    onChanged: (_) => _selectPlayer(i, null),
+                  );
+                },
+                optionsViewBuilder: (context, onSelected, options) {
+                  return _buildOptionsCard<Customer>(
+                    context,
+                    options: options,
+                    onSelected: onSelected,
+                    labelOf: (customer) => customer.phone.trim().isEmpty
+                        ? customer.name
+                        : "${customer.name} (${customer.phone})",
+                  );
+                },
               ),
             ],
           ],

@@ -21,10 +21,16 @@ class PoolTable {
   final int? customerId;
   final String? memberName;
 
-  /// Free-text player names (comma-separated, up to 4) — mahjong-specific,
-  /// separate from [memberName] which is a single registered member tied to
-  /// loyalty points/saldo. See table_active.table_players on the backend.
+  /// Player display names (comma-separated, up to 4, resolved server-side
+  /// from [playerIds]) — mahjong-specific, separate from [memberName] which
+  /// is a single registered member tied to loyalty points/saldo. See
+  /// table_active.table_players on the backend.
   final String? players;
+
+  /// Customer ids behind [players] (comma-separated) — same member can't
+  /// appear twice here, and can't be active on another table at the same
+  /// time (enforced server-side, see Billing_model::resolve_players).
+  final String? playerIds;
   final int? promoId;
   final String? promoName;
   final PromoType? promoType;
@@ -53,6 +59,7 @@ class PoolTable {
     this.customerId,
     this.memberName,
     this.players,
+    this.playerIds,
     this.promoId,
     this.promoName,
     this.promoType,
@@ -64,6 +71,14 @@ class PoolTable {
     this.prepaidSaldo = false,
     this.saldoPrepaidAmount = 0,
   });
+
+  /// [playerIds] parsed into individual customer ids.
+  List<int> get playerIdList =>
+      (playerIds ?? "")
+          .split(",")
+          .map((s) => int.tryParse(s.trim()))
+          .whereType<int>()
+          .toList();
 
   /// True when this table is running under a "Fix" package promo (fixed
   /// price+duration) — such tables can't have their duration extended, since
@@ -81,6 +96,7 @@ class PoolTable {
     int? customerId,
     String? memberName,
     String? players,
+    String? playerIds,
     int? promoId,
     String? promoName,
     PromoType? promoType,
@@ -106,6 +122,7 @@ class PoolTable {
       customerId: customerId ?? this.customerId,
       memberName: memberName ?? this.memberName,
       players: players ?? this.players,
+      playerIds: playerIds ?? this.playerIds,
       promoId: promoId ?? this.promoId,
       promoName: promoName ?? this.promoName,
       promoType: promoType ?? this.promoType,

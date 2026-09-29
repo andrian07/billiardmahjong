@@ -128,6 +128,10 @@ class TableRepository {
       players: (json['table_players']?.toString().trim().isNotEmpty ?? false)
           ? json['table_players'].toString().trim()
           : null,
+      playerIds:
+          (json['table_player_ids']?.toString().trim().isNotEmpty ?? false)
+          ? json['table_player_ids'].toString().trim()
+          : null,
       promoId: (promoId != null && promoId != 0) ? promoId : null,
       promoName: promo?.name,
       promoType: promo?.type,

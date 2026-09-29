@@ -72,7 +72,7 @@ class BillingRepository {
     required SessionType mode,
     required DateTime startTime,
     int? customerId,
-    String? players,
+    String? playerIds,
     int? promoId,
     DateTime? endTime,
     Duration? duration,
@@ -87,8 +87,8 @@ class BillingRepository {
       "table_mode": mode == SessionType.timer ? "Timer" : "Reguler",
       "table_start_time": formatApiDateTime(startTime),
       if (customerId != null) "table_customer_id": "$customerId",
-      if (players != null && players.trim().isNotEmpty)
-        "table_players": players.trim(),
+      if (playerIds != null && playerIds.trim().isNotEmpty)
+        "table_player_ids": playerIds.trim(),
       if (promoId != null) "table_promo_id": "$promoId",
       if (endTime != null) "table_end_time": formatApiDateTime(endTime),
       if (duration != null) "table_duration": formatDuration(duration),
