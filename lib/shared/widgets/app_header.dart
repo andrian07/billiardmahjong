@@ -34,7 +34,8 @@ class AppHeader extends StatefulWidget {
   State<AppHeader> createState() => _AppHeaderState();
 }
 
-class _AppHeaderState extends State<AppHeader> {
+class _AppHeaderState extends State<AppHeader>
+    with SingleTickerProviderStateMixin {
   String _username = "";
   String _roleName = "";
 
@@ -44,13 +45,23 @@ class _AppHeaderState extends State<AppHeader> {
   // navigating to a different page) - see _onExpiredTablesChanged below.
   Set<String> _seenExpiredIds = {};
 
+  // Drives the alarm icon blinking while at least one table is expired -
+  // repeats (fade in/out) as long as expiredTables isn't empty, stopped
+  // (held at full opacity) otherwise. See _onExpiredTablesChanged.
+  late final _blinkController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 550),
+    lowerBound: 0.25,
+    upperBound: 1,
+  );
+
   @override
   void initState() {
     super.initState();
     _loadSession();
-    _seenExpiredIds = TimerExpiryWatcher.instance.expiredTables.value
-        .map((t) => t.id)
-        .toSet();
+    final initialExpired = TimerExpiryWatcher.instance.expiredTables.value;
+    _seenExpiredIds = initialExpired.map((t) => t.id).toSet();
+    if (initialExpired.isNotEmpty) _blinkController.repeat(reverse: true);
     TimerExpiryWatcher.instance.expiredTables.addListener(
       _onExpiredTablesChanged,
     );
@@ -61,6 +72,7 @@ class _AppHeaderState extends State<AppHeader> {
     TimerExpiryWatcher.instance.expiredTables.removeListener(
       _onExpiredTablesChanged,
     );
+    _blinkController.dispose();
     super.dispose();
   }
 
@@ -70,6 +82,14 @@ class _AppHeaderState extends State<AppHeader> {
         .where((t) => !_seenExpiredIds.contains(t.id))
         .toList();
     _seenExpiredIds = tables.map((t) => t.id).toSet();
+
+    if (tables.isEmpty) {
+      _blinkController.stop();
+      _blinkController.value = 1;
+    } else if (!_blinkController.isAnimating) {
+      _blinkController.repeat(reverse: true);
+    }
+
     if (newlyExpired.isEmpty || !mounted) return;
 
     for (final table in newlyExpired) {
@@ -239,15 +259,18 @@ class _AppHeaderState extends State<AppHeader> {
                 onPressed: tables.isEmpty
                     ? null
                     : () => _openExpiredTables(context, tables),
-                icon: Badge(
-                  isLabelVisible: tables.isNotEmpty,
-                  label: Text("${tables.length}"),
-                  backgroundColor: AppColors.danger,
-                  child: Icon(
-                    Icons.alarm_rounded,
-                    color: tables.isNotEmpty
-                        ? AppColors.danger
-                        : AppColors.textSecondary,
+                icon: FadeTransition(
+                  opacity: _blinkController,
+                  child: Badge(
+                    isLabelVisible: tables.isNotEmpty,
+                    label: Text("${tables.length}"),
+                    backgroundColor: AppColors.danger,
+                    child: Icon(
+                      Icons.alarm_rounded,
+                      color: tables.isNotEmpty
+                          ? AppColors.danger
+                          : AppColors.textSecondary,
+                    ),
                   ),
                 ),
               );
