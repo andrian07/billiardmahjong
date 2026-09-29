@@ -522,259 +522,81 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
           const Divider(color: AppColors.divider, height: 1),
           const SizedBox(height: 22),
 
-          _label("Mode"),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _typeOption(
-                  SessionType.reguler,
-                  "Reguler",
-                  "Bayar per jam",
-                  Icons.schedule_rounded,
-                  enabled: !_promoRequiresTimer,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _typeOption(
-                  SessionType.timer,
-                  "Timer",
-                  "Sesi dengan durasi",
-                  Icons.timer_rounded,
-                ),
-              ),
-            ],
-          ),
-
-          if (!_isMahjong) ...[
-            const SizedBox(height: 20),
-            _label("Nama Member (Opsional)"),
-            const SizedBox(height: 8),
-            Autocomplete<Customer>(
-              displayStringForOption: (customer) => customer.name,
-              optionsBuilder: (textEditingValue) {
-                if (textEditingValue.text.isEmpty) return _customers;
-                final query = textEditingValue.text.toLowerCase();
-                return _customers.where(
-                  (customer) =>
-                      customer.name.toLowerCase().contains(query) ||
-                      customer.phone.toLowerCase().contains(query),
-                );
-              },
-              onSelected: (customer) => _selectCustomer(customer),
-              fieldViewBuilder: (context, controller, focusNode, onSubmit) {
-                return TextField(
-                  controller: controller,
-                  focusNode: focusNode,
-                  style: AppText.body,
-                  decoration: _inputDecoration(
-                    hint: "Cari nama / no. HP member",
-                    prefixIcon: Icons.person_outline_rounded,
+          // Meja mahjong: popup sudah dilebarkan (lihat build()) khusus supaya
+          // muat 2 kolom - kiri isi pemain, kanan isi mode/jam main/promo.
+          // Saved-time & Potong Saldo TIDAK ikut di kolom manapun di sini -
+          // keduanya cuma relevan kalau _selectedCustomer terisi, dan itu
+          // cuma bisa lewat field "Nama Member" yang sengaja disembunyikan
+          // untuk mahjong (lihat _buildMemberSection), jadi otomatis tidak
+          // pernah aktif di jalur ini.
+          if (_isMahjong)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: _buildPlayersSection(),
                   ),
-                  onChanged: (_) => _selectCustomer(null),
-                );
-              },
-              optionsViewBuilder: (context, onSelected, options) {
-                return _buildOptionsCard<Customer>(
-                  context,
-                  options: options,
-                  onSelected: onSelected,
-                  labelOf: (customer) => customer.phone.trim().isEmpty
-                      ? customer.name
-                      : "${customer.name} (${customer.phone})",
-                );
-              },
-            ),
-          ],
-
-          if (_isMahjong) ...[
-            const SizedBox(height: 20),
-            _label("Pemain (Opsional, maks 4, harus member terdaftar)"),
-            const SizedBox(height: 8),
-            for (var i = 0; i < 4; i++) ...[
-              if (i > 0) const SizedBox(height: 8),
-              Autocomplete<Customer>(
-                key: ValueKey('player_$i'),
-                textEditingController: _playerFieldControllers[i],
-                focusNode: _playerFocusNodes[i],
-                displayStringForOption: (customer) => customer.name,
-                optionsBuilder: (textEditingValue) {
-                  final query = textEditingValue.text.toLowerCase();
-                  final takenIds = {
-                    ..._occupiedElsewhere,
-                    for (var j = 0; j < 4; j++)
-                      if (j != i && _selectedPlayers[j] != null)
-                        _selectedPlayers[j]!.id,
-                  };
-                  return _customers.where(
-                    (customer) =>
-                        !takenIds.contains(customer.id) &&
-                        (query.isEmpty ||
-                            customer.name.toLowerCase().contains(query) ||
-                            customer.phone.toLowerCase().contains(query)),
-                  );
-                },
-                onSelected: (customer) => _selectPlayer(i, customer),
-                fieldViewBuilder: (context, controller, focusNode, onSubmit) {
-                  return TextField(
-                    controller: controller,
-                    focusNode: focusNode,
-                    style: AppText.body,
-                    decoration: _inputDecoration(
-                      hint: "Pemain ${i + 1} - cari nama / no. HP member",
-                      prefixIcon: Icons.person_outline_rounded,
+                ),
+                const SizedBox(width: 24),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ..._buildModeSection(),
+                      ..._buildDurationSection(),
+                      ..._buildPromoSection(),
+                    ],
+                  ),
+                ),
+              ],
+            )
+          else ...[
+            ..._buildModeSection(),
+            ..._buildMemberSection(),
+            if (_checkingSavedTime) ...[
+              const SizedBox(height: 14),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 4),
+                child: Center(
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              ),
+            ] else if (_savedTime != null) ...[
+              const SizedBox(height: 14),
+              _buildSavedTimeSection(_savedTime!),
+            ],
+            if (_canOfferPrepaidSaldo) ...[
+              const SizedBox(height: 20),
+              _label("Potong Saldo"),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _toggleOption(
+                      label: "Ya",
+                      selected: _prepaidSaldo,
+                      onTap: () => setState(() => _prepaidSaldo = true),
                     ),
-                    onChanged: (_) => _selectPlayer(i, null),
-                  );
-                },
-                optionsViewBuilder: (context, onSelected, options) {
-                  return _buildOptionsCard<Customer>(
-                    context,
-                    options: options,
-                    onSelected: onSelected,
-                    labelOf: (customer) => customer.phone.trim().isEmpty
-                        ? customer.name
-                        : "${customer.name} (${customer.phone})",
-                  );
-                },
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _toggleOption(
+                      label: "Tidak",
+                      selected: !_prepaidSaldo,
+                      onTap: () => setState(() => _prepaidSaldo = false),
+                    ),
+                  ),
+                ],
               ),
             ],
-          ],
-
-          if (_checkingSavedTime) ...[
-            const SizedBox(height: 14),
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 4),
-              child: Center(
-                child: SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-            ),
-          ] else if (_savedTime != null) ...[
-            const SizedBox(height: 14),
-            _buildSavedTimeSection(_savedTime!),
-          ],
-
-          if (_canOfferPrepaidSaldo) ...[
-            const SizedBox(height: 20),
-            _label("Potong Saldo"),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _toggleOption(
-                    label: "Ya",
-                    selected: _prepaidSaldo,
-                    onTap: () => setState(() => _prepaidSaldo = true),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _toggleOption(
-                    label: "Tidak",
-                    selected: !_prepaidSaldo,
-                    onTap: () => setState(() => _prepaidSaldo = false),
-                  ),
-                ),
-              ],
-            ),
-          ],
-
-          if (_sessionType == SessionType.timer) ...[
-            const SizedBox(height: 20),
-            _label("Durasi Sesi"),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _durationField(
-                    controller: _hourController,
-                    options: hourOptions,
-                    suffix: "jam",
-                    enabled: _durationFieldsEnabled,
-                    onChanged: (value) => setState(() {
-                      _durationHours = value;
-                      _durationError = _exceedsSavedTime
-                          ? _savedTimeErrorText
-                          : null;
-                    }),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _durationField(
-                    controller: _minuteController,
-                    options: minuteOptions,
-                    suffix: "menit",
-                    enabled: _durationFieldsEnabled,
-                    onChanged: (value) => setState(() {
-                      _durationMinutes = value;
-                      _durationError = _exceedsSavedTime
-                          ? _savedTimeErrorText
-                          : null;
-                    }),
-                  ),
-                ),
-              ],
-            ),
-            if (_durationError != null) ...[
-              const SizedBox(height: 6),
-              Text(
-                _durationError!,
-                style: AppText.caption.copyWith(color: AppColors.danger),
-              ),
-            ],
-          ],
-
-          const SizedBox(height: 20),
-          _label("Promo (Opsional)"),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<Promo?>(
-            initialValue: _selectedPromo,
-            dropdownColor: AppColors.card,
-            style: AppText.body,
-            isExpanded: true,
-            icon: const Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: AppColors.textSecondary,
-            ),
-            decoration: _inputDecoration(
-              hint: "Tanpa promo",
-              prefixIcon: Icons.local_offer_outlined,
-            ),
-            items: [
-              const DropdownMenuItem<Promo?>(
-                value: null,
-                child: Text("Tanpa Promo"),
-              ),
-              for (final promo in _promosForTable)
-                DropdownMenuItem<Promo?>(
-                  value: promo,
-                  child: Text(promo.name, overflow: TextOverflow.ellipsis),
-                ),
-            ],
-            onChanged: _selectPromo,
-          ),
-          if (_promoLocksDuration) ...[
-            const SizedBox(height: 8),
-            Text(
-              "Durasi timer otomatis mengikuti promo ini "
-              "(${_selectedPromo!.hourGained} jam) dan tidak bisa diubah.",
-              style: AppText.caption,
-            ),
-          ],
-          if (_promoRequiresTimer) ...[
-            const SizedBox(height: 8),
-            Text(
-              "Promo ini hanya berlaku untuk mode Timer, dan sesi harus "
-              "selesai antara jam ${_selectedPromo!.validTimeStart}:00 - "
-              "${_selectedPromo!.validTimeEnd}:00.",
-              style: AppText.caption,
-            ),
+            ..._buildDurationSection(),
+            ..._buildPromoSection(),
           ],
 
           const SizedBox(height: 28),
@@ -822,6 +644,229 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
         ],
       ),
     );
+  }
+
+  List<Widget> _buildModeSection() {
+    return [
+      _label("Mode"),
+      const SizedBox(height: 10),
+      Row(
+        children: [
+          Expanded(
+            child: _typeOption(
+              SessionType.reguler,
+              "Reguler",
+              "Bayar per jam",
+              Icons.schedule_rounded,
+              enabled: !_promoRequiresTimer,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _typeOption(
+              SessionType.timer,
+              "Timer",
+              "Sesi dengan durasi",
+              Icons.timer_rounded,
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 20),
+    ];
+  }
+
+  List<Widget> _buildMemberSection() {
+    return [
+      _label("Nama Member (Opsional)"),
+      const SizedBox(height: 8),
+      Autocomplete<Customer>(
+        displayStringForOption: (customer) => customer.name,
+        optionsBuilder: (textEditingValue) {
+          if (textEditingValue.text.isEmpty) return _customers;
+          final query = textEditingValue.text.toLowerCase();
+          return _customers.where(
+            (customer) =>
+                customer.name.toLowerCase().contains(query) ||
+                customer.phone.toLowerCase().contains(query),
+          );
+        },
+        onSelected: (customer) => _selectCustomer(customer),
+        fieldViewBuilder: (context, controller, focusNode, onSubmit) {
+          return TextField(
+            controller: controller,
+            focusNode: focusNode,
+            style: AppText.body,
+            decoration: _inputDecoration(
+              hint: "Cari nama / no. HP member",
+              prefixIcon: Icons.person_outline_rounded,
+            ),
+            onChanged: (_) => _selectCustomer(null),
+          );
+        },
+        optionsViewBuilder: (context, onSelected, options) {
+          return _buildOptionsCard<Customer>(
+            context,
+            options: options,
+            onSelected: onSelected,
+            labelOf: (customer) => customer.phone.trim().isEmpty
+                ? customer.name
+                : "${customer.name} (${customer.phone})",
+          );
+        },
+      ),
+    ];
+  }
+
+  List<Widget> _buildPlayersSection() {
+    return [
+      _label("Pemain (Opsional, maks 4, harus member terdaftar)"),
+      const SizedBox(height: 8),
+      for (var i = 0; i < 4; i++) ...[
+        if (i > 0) const SizedBox(height: 8),
+        Autocomplete<Customer>(
+          key: ValueKey('player_$i'),
+          textEditingController: _playerFieldControllers[i],
+          focusNode: _playerFocusNodes[i],
+          displayStringForOption: (customer) => customer.name,
+          optionsBuilder: (textEditingValue) {
+            final query = textEditingValue.text.toLowerCase();
+            final takenIds = {
+              ..._occupiedElsewhere,
+              for (var j = 0; j < 4; j++)
+                if (j != i && _selectedPlayers[j] != null)
+                  _selectedPlayers[j]!.id,
+            };
+            return _customers.where(
+              (customer) =>
+                  !takenIds.contains(customer.id) &&
+                  (query.isEmpty ||
+                      customer.name.toLowerCase().contains(query) ||
+                      customer.phone.toLowerCase().contains(query)),
+            );
+          },
+          onSelected: (customer) => _selectPlayer(i, customer),
+          fieldViewBuilder: (context, controller, focusNode, onSubmit) {
+            return TextField(
+              controller: controller,
+              focusNode: focusNode,
+              style: AppText.body,
+              decoration: _inputDecoration(
+                hint: "Pemain ${i + 1} - cari nama / no. HP member",
+                prefixIcon: Icons.person_outline_rounded,
+              ),
+              onChanged: (_) => _selectPlayer(i, null),
+            );
+          },
+          optionsViewBuilder: (context, onSelected, options) {
+            return _buildOptionsCard<Customer>(
+              context,
+              options: options,
+              onSelected: onSelected,
+              labelOf: (customer) => customer.phone.trim().isEmpty
+                  ? customer.name
+                  : "${customer.name} (${customer.phone})",
+            );
+          },
+        ),
+      ],
+    ];
+  }
+
+  List<Widget> _buildDurationSection() {
+    if (_sessionType != SessionType.timer) return const [];
+    return [
+      const SizedBox(height: 20),
+      _label("Durasi Sesi"),
+      const SizedBox(height: 8),
+      Row(
+        children: [
+          Expanded(
+            child: _durationField(
+              controller: _hourController,
+              options: hourOptions,
+              suffix: "jam",
+              enabled: _durationFieldsEnabled,
+              onChanged: (value) => setState(() {
+                _durationHours = value;
+                _durationError = _exceedsSavedTime ? _savedTimeErrorText : null;
+              }),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _durationField(
+              controller: _minuteController,
+              options: minuteOptions,
+              suffix: "menit",
+              enabled: _durationFieldsEnabled,
+              onChanged: (value) => setState(() {
+                _durationMinutes = value;
+                _durationError = _exceedsSavedTime ? _savedTimeErrorText : null;
+              }),
+            ),
+          ),
+        ],
+      ),
+      if (_durationError != null) ...[
+        const SizedBox(height: 6),
+        Text(
+          _durationError!,
+          style: AppText.caption.copyWith(color: AppColors.danger),
+        ),
+      ],
+    ];
+  }
+
+  List<Widget> _buildPromoSection() {
+    return [
+      const SizedBox(height: 20),
+      _label("Promo (Opsional)"),
+      const SizedBox(height: 8),
+      DropdownButtonFormField<Promo?>(
+        initialValue: _selectedPromo,
+        dropdownColor: AppColors.card,
+        style: AppText.body,
+        isExpanded: true,
+        icon: const Icon(
+          Icons.keyboard_arrow_down_rounded,
+          color: AppColors.textSecondary,
+        ),
+        decoration: _inputDecoration(
+          hint: "Tanpa promo",
+          prefixIcon: Icons.local_offer_outlined,
+        ),
+        items: [
+          const DropdownMenuItem<Promo?>(
+            value: null,
+            child: Text("Tanpa Promo"),
+          ),
+          for (final promo in _promosForTable)
+            DropdownMenuItem<Promo?>(
+              value: promo,
+              child: Text(promo.name, overflow: TextOverflow.ellipsis),
+            ),
+        ],
+        onChanged: _selectPromo,
+      ),
+      if (_promoLocksDuration) ...[
+        const SizedBox(height: 8),
+        Text(
+          "Durasi timer otomatis mengikuti promo ini "
+          "(${_selectedPromo!.hourGained} jam) dan tidak bisa diubah.",
+          style: AppText.caption,
+        ),
+      ],
+      if (_promoRequiresTimer) ...[
+        const SizedBox(height: 8),
+        Text(
+          "Promo ini hanya berlaku untuk mode Timer, dan sesi harus "
+          "selesai antara jam ${_selectedPromo!.validTimeStart}:00 - "
+          "${_selectedPromo!.validTimeEnd}:00.",
+          style: AppText.caption,
+        ),
+      ],
+    ];
   }
 
   Widget _buildHeader() {
