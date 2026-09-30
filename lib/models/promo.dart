@@ -17,6 +17,9 @@ class Promo {
   final int id;
   final String name;
   final PromoType type;
+
+  /// 'billiard' / 'mahjong' — promo hanya tampil & berlaku untuk meja sejenis.
+  final String tableType;
   final int value;
 
   /// Hours granted when this promo is picked while starting a Timer session
@@ -56,6 +59,7 @@ class Promo {
     required this.id,
     required this.name,
     required this.type,
+    this.tableType = 'billiard',
     required this.value,
     this.hourGained,
     this.freeHour,
@@ -83,6 +87,9 @@ class Promo {
       id: rawId is int ? rawId : int.tryParse(rawId.toString()) ?? 0,
       name: json['name']?.toString() ?? "",
       type: PromoType.fromApiValue(json['tipe']?.toString() ?? ""),
+      tableType: json['table_type']?.toString() == 'mahjong'
+          ? 'mahjong'
+          : 'billiard',
       value: rawValue is int
           ? rawValue
           : int.tryParse(rawValue.toString()) ?? 0,

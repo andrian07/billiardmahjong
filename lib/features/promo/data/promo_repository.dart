@@ -69,6 +69,7 @@ class PromoRepository {
   Future<void> addPromo({
     required String name,
     required PromoType type,
+    String tableType = 'billiard',
     required int value,
     int? hourGained,
     int? freeHour,
@@ -80,6 +81,7 @@ class PromoRepository {
     return _post(ApiEndpoints.addPromo, {
       "ms_promo_name": name,
       "ms_promo_tipe": type.apiValue,
+      "ms_promo_table_type": tableType,
       "ms_promo_value": "$value",
       if (hourGained != null) "hour": "$hourGained",
       if (freeHour != null) "free_hour": "$freeHour",
@@ -95,6 +97,7 @@ class PromoRepository {
     required int id,
     required String name,
     required PromoType type,
+    String tableType = 'billiard',
     required int value,
     int? hourGained,
     int? freeHour,
@@ -107,6 +110,7 @@ class PromoRepository {
       "ms_promo_id": "$id",
       "ms_promo_name": name,
       "ms_promo_tipe": type.apiValue,
+      "ms_promo_table_type": tableType,
       "ms_promo_value": "$value",
       "hour": hourGained != null ? "$hourGained" : "",
       "free_hour": freeHour != null ? "$freeHour" : "",

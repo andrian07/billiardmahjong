@@ -13,7 +13,6 @@ import '../../../models/saved_customer_time.dart';
 import '../../../shared/widgets/app_toast.dart';
 import '../../customer/data/customer_repository.dart';
 import '../../promo/data/promo_repository.dart';
-import '../data/billing_repository.dart';
 import '../data/table_repository.dart';
 import 'member_time_history_dialog.dart';
 
@@ -60,7 +59,6 @@ class StartSessionDialog extends StatefulWidget {
 class _StartSessionDialogState extends State<StartSessionDialog> {
   final _customerRepository = CustomerRepository();
   final _promoRepository = PromoRepository();
-  final _billingRepository = BillingRepository();
 
   SessionType _sessionType = SessionType.reguler;
   Customer? _selectedCustomer;
@@ -69,7 +67,7 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
   int _durationMinutes = 0;
   String? _durationError;
 
-  bool _checkingSavedTime = false;
+  final bool _checkingSavedTime = false;
   SavedCustomerTime? _savedTime;
   bool? _useSavedTime;
   bool? _habiskanTimer;
@@ -121,7 +119,11 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
   List<Promo> get _promosForTable {
     final cat = widget.table.categoryMejaId;
     return _promos
-        .where((p) => p.categoryIds.isEmpty || p.categoryIds.contains(cat))
+        .where(
+          (p) =>
+              p.tableType == widget.table.categoryType &&
+              (p.categoryIds.isEmpty || p.categoryIds.contains(cat)),
+        )
         .toList();
   }
 
@@ -223,7 +225,8 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
 
   void _selectPromo(Promo? promo) {
     if (promo != null && promo.hasDayRestriction) {
-      final today = DateTime.now().weekday; // 1=Senin..7=Minggu, matches validDays
+      final today =
+          DateTime.now().weekday; // 1=Senin..7=Minggu, matches validDays
       if (!promo.validDays!.contains(today)) {
         final days = promo.validDays!.map((d) => weekdayLabels[d]).join(", ");
         AppToast.error(
@@ -310,30 +313,6 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
     setState(() => _selectedPlayers[index] = customer);
   }
 
-  Future<void> _selectCustomer(Customer? customer) async {
-    setState(() {
-      _selectedCustomer = customer;
-      _savedTime = null;
-      _useSavedTime = null;
-      _habiskanTimer = null;
-      _prepaidSaldo = false;
-      _checkingSavedTime = customer != null;
-    });
-
-    if (customer == null) return;
-
-    final savedTime = await _billingRepository.getSavedCustomerTime(
-      customerId: customer.id,
-      tableId: widget.table.id,
-    );
-    if (!mounted || _selectedCustomer?.id != customer.id) return;
-
-    setState(() {
-      _savedTime = savedTime != null && savedTime.hasBalance ? savedTime : null;
-      _checkingSavedTime = false;
-    });
-  }
-
   void _setUseSavedTime(bool value) {
     setState(() {
       _useSavedTime = value;
@@ -368,10 +347,7 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
     final isTimer = _sessionType == SessionType.timer;
     final usingSavedTime =
         isTimer && _useSavedTime == true && _savedTime != null;
-    final duration = Duration(
-      hours: _durationHours,
-      minutes: _durationMinutes,
-    );
+    final duration = Duration(hours: _durationHours, minutes: _durationMinutes);
 
     if (usingSavedTime && _habiskanTimer == null) {
       setState(
@@ -403,7 +379,8 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
       // tengah malam (mis. 22 s/d 4) - digeser relatif ke validTimeStart lalu dibungkus modulo
       // 24 jam supaya jendela normal & lintas-tengah-malam bisa dicek dengan rumus yang sama.
       // Sama persis dengan Billing_model::validate_promo_schedule() di backend.
-      final windowLength = (promo.validTimeEnd! - promo.validTimeStart! + 24) % 24;
+      final windowLength =
+          (promo.validTimeEnd! - promo.validTimeStart! + 24) % 24;
       final shiftedStart = (startHod - promo.validTimeStart! + 24) % 24;
       final shiftedEnd = shiftedStart + elapsedHours;
 
@@ -426,10 +403,7 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
     }
 
     final playerIds = _isMahjong
-        ? _selectedPlayers
-              .whereType<Customer>()
-              .map((c) => "${c.id}")
-              .join(",")
+        ? _selectedPlayers.whereType<Customer>().map((c) => "${c.id}").join(",")
         : "";
 
     Navigator.of(context).pop(
@@ -481,11 +455,7 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.cloud_off_rounded,
-              size: 30,
-              color: AppColors.danger,
-            ),
+            Icon(Icons.cloud_off_rounded, size: 30, color: AppColors.danger),
             const SizedBox(height: 12),
             Text(
               _loadError!,
@@ -554,7 +524,6 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
             )
           else ...[
             ..._buildModeSection(),
-            ..._buildMemberSection(),
             if (_checkingSavedTime) ...[
               const SizedBox(height: 14),
               const Padding(
@@ -648,7 +617,7 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
 
   List<Widget> _buildModeSection() {
     return [
-      _label("Mode"),
+      _label(_isMahjong ? "Mode Sesi" : "Mode"),
       const SizedBox(height: 10),
       Row(
         children: [
@@ -676,112 +645,183 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
     ];
   }
 
-  List<Widget> _buildMemberSection() {
+  List<Widget> _buildPlayersSection() {
     return [
-      _label("Nama Member (Opsional)"),
-      const SizedBox(height: 8),
-      Autocomplete<Customer>(
-        displayStringForOption: (customer) => customer.name,
-        optionsBuilder: (textEditingValue) {
-          if (textEditingValue.text.isEmpty) return _customers;
-          final query = textEditingValue.text.toLowerCase();
-          return _customers.where(
-            (customer) =>
-                customer.name.toLowerCase().contains(query) ||
-                customer.phone.toLowerCase().contains(query),
-          );
-        },
-        onSelected: (customer) => _selectCustomer(customer),
-        fieldViewBuilder: (context, controller, focusNode, onSubmit) {
-          return TextField(
-            controller: controller,
-            focusNode: focusNode,
-            style: AppText.body,
-            decoration: _inputDecoration(
-              hint: "Cari nama / no. HP member",
-              prefixIcon: Icons.person_outline_rounded,
-            ),
-            onChanged: (_) => _selectCustomer(null),
-          );
-        },
-        optionsViewBuilder: (context, onSelected, options) {
-          return _buildOptionsCard<Customer>(
-            context,
-            options: options,
-            onSelected: onSelected,
-            labelOf: (customer) => customer.phone.trim().isEmpty
-                ? customer.name
-                : "${customer.name} (${customer.phone})",
-          );
-        },
-      ),
+      _label("Pemain (Opsional, maks 4)"),
+      const SizedBox(height: 10),
+      for (var i = 0; i < 4; i++) ...[
+        if (i > 0) const SizedBox(height: 10),
+        _playerSlot(i),
+      ],
     ];
   }
 
-  List<Widget> _buildPlayersSection() {
-    return [
-      _label("Pemain (Opsional, maks 4, harus member terdaftar)"),
-      const SizedBox(height: 8),
-      for (var i = 0; i < 4; i++) ...[
-        if (i > 0) const SizedBox(height: 8),
-        Autocomplete<Customer>(
-          key: ValueKey('player_$i'),
-          textEditingController: _playerFieldControllers[i],
-          focusNode: _playerFocusNodes[i],
-          displayStringForOption: (customer) => customer.name,
-          optionsBuilder: (textEditingValue) {
-            final query = textEditingValue.text.toLowerCase();
-            final takenIds = {
-              ..._occupiedElsewhere,
-              for (var j = 0; j < 4; j++)
-                if (j != i && _selectedPlayers[j] != null)
-                  _selectedPlayers[j]!.id,
-            };
-            return _customers.where(
-              (customer) =>
-                  !takenIds.contains(customer.id) &&
-                  (query.isEmpty ||
-                      customer.name.toLowerCase().contains(query) ||
-                      customer.phone.toLowerCase().contains(query)),
-            );
-          },
-          onSelected: (customer) => _selectPlayer(i, customer),
-          fieldViewBuilder: (context, controller, focusNode, onSubmit) {
-            return TextField(
-              controller: controller,
-              focusNode: focusNode,
-              style: AppText.body,
-              decoration: _inputDecoration(
-                hint: "Pemain ${i + 1} - cari nama / no. HP member",
-                prefixIcon: Icons.person_outline_rounded,
-                suffixIcon: _selectedPlayers[i] != null
-                    ? IconButton(
-                        tooltip: "Batalkan pemain ${i + 1}",
-                        icon: const Icon(Icons.close_rounded, size: 18),
-                        color: AppColors.textSecondary,
-                        onPressed: () {
-                          controller.clear();
-                          _selectPlayer(i, null);
-                        },
-                      )
-                    : null,
-              ),
-              onChanged: (_) => _selectPlayer(i, null),
-            );
-          },
-          optionsViewBuilder: (context, onSelected, options) {
-            return _buildOptionsCard<Customer>(
-              context,
-              options: options,
-              onSelected: onSelected,
-              labelOf: (customer) => customer.phone.trim().isEmpty
-                  ? customer.name
-                  : "${customer.name} (${customer.phone})",
-            );
-          },
+  Widget _playerSlot(int i) {
+    final player = _selectedPlayers[i];
+    final filled = player != null;
+    return InkWell(
+      onTap: () => _pickPlayer(i),
+      borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: filled
+              ? AppColors.primary.withValues(alpha: .10)
+              : AppColors.background,
+          borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+          border: Border.all(
+            color: filled ? AppColors.primary : AppColors.border,
+            width: filled ? 1.5 : 1,
+          ),
         ),
-      ],
-    ];
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 17,
+              backgroundColor: filled
+                  ? AppColors.primary
+                  : AppColors.primary.withValues(alpha: .15),
+              child: filled
+                  ? Text(
+                      "${i + 1}",
+                      style: AppText.body.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    )
+                  : const Icon(
+                      Icons.person_outline_rounded,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Pemain ${i + 1}",
+                    style: AppText.body.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  Text(
+                    filled
+                        ? (player.phone.trim().isEmpty
+                              ? player.name
+                              : "${player.name} (${player.phone})")
+                        : "Cari nama / no. HP member",
+                    style: AppText.caption,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            if (filled)
+              IconButton(
+                tooltip: "Batalkan pemain ${i + 1}",
+                icon: const Icon(Icons.close_rounded, size: 18),
+                color: AppColors.textSecondary,
+                onPressed: () => _selectPlayer(i, null),
+              )
+            else
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.textSecondary,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickPlayer(int i) async {
+    final takenIds = {
+      ..._occupiedElsewhere,
+      for (var j = 0; j < 4; j++)
+        if (j != i && _selectedPlayers[j] != null) _selectedPlayers[j]!.id,
+    };
+    final picked = await showDialog<Customer>(
+      context: context,
+      builder: (context) {
+        var query = "";
+        return StatefulBuilder(
+          builder: (context, setLocal) {
+            final q = query.toLowerCase();
+            final options = _customers
+                .where(
+                  (c) =>
+                      !takenIds.contains(c.id) &&
+                      (q.isEmpty ||
+                          c.name.toLowerCase().contains(q) ||
+                          c.phone.toLowerCase().contains(q)),
+                )
+                .toList();
+            return Dialog(
+              backgroundColor: AppColors.card,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppSizes.radiusLarge),
+              ),
+              child: Container(
+                width: 400,
+                constraints: const BoxConstraints(maxHeight: 460),
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Pilih Pemain ${i + 1}",
+                      style: AppText.title.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      autofocus: true,
+                      style: AppText.body,
+                      decoration: _inputDecoration(
+                        hint: "Cari nama / no. HP member",
+                        prefixIcon: Icons.search_rounded,
+                      ),
+                      onChanged: (v) => setLocal(() => query = v),
+                    ),
+                    const SizedBox(height: 8),
+                    Flexible(
+                      child: options.isEmpty
+                          ? Padding(
+                              padding: const EdgeInsets.all(20),
+                              child: Center(
+                                child: Text(
+                                  "Member tidak ditemukan",
+                                  style: AppText.caption,
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: options.length,
+                              itemBuilder: (context, index) {
+                                final c = options[index];
+                                return ListTile(
+                                  dense: true,
+                                  title: Text(c.name, style: AppText.body),
+                                  subtitle: c.phone.trim().isEmpty
+                                      ? null
+                                      : Text(c.phone, style: AppText.caption),
+                                  onTap: () => Navigator.of(context).pop(c),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+    if (picked != null && mounted) _selectPlayer(i, picked);
   }
 
   List<Widget> _buildDurationSection() {
@@ -790,35 +830,76 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
       const SizedBox(height: 20),
       _label("Durasi Sesi"),
       const SizedBox(height: 8),
-      Row(
-        children: [
-          Expanded(
-            child: _durationField(
-              controller: _hourController,
-              options: hourOptions,
-              suffix: "jam",
-              enabled: _durationFieldsEnabled,
-              onChanged: (value) => setState(() {
-                _durationHours = value;
-                _durationError = _exceedsSavedTime ? _savedTimeErrorText : null;
-              }),
+      if (_isMahjong)
+        Row(
+          children: [
+            Expanded(
+              child: _stepper(
+                value: _durationHours,
+                unit: "Jam",
+                step: 1,
+                max: hourOptions.last,
+                onChanged: (v) => setState(() {
+                  _durationHours = v;
+                  _hourController.text = "$v";
+                  _durationError = _exceedsSavedTime
+                      ? _savedTimeErrorText
+                      : null;
+                }),
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _durationField(
-              controller: _minuteController,
-              options: minuteOptions,
-              suffix: "menit",
-              enabled: _durationFieldsEnabled,
-              onChanged: (value) => setState(() {
-                _durationMinutes = value;
-                _durationError = _exceedsSavedTime ? _savedTimeErrorText : null;
-              }),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _stepper(
+                value: _durationMinutes,
+                unit: "Menit",
+                step: 15,
+                max: minuteOptions.last,
+                onChanged: (v) => setState(() {
+                  _durationMinutes = v;
+                  _minuteController.text = "$v";
+                  _durationError = _exceedsSavedTime
+                      ? _savedTimeErrorText
+                      : null;
+                }),
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        )
+      else
+        Row(
+          children: [
+            Expanded(
+              child: _durationField(
+                controller: _hourController,
+                options: hourOptions,
+                suffix: "jam",
+                enabled: _durationFieldsEnabled,
+                onChanged: (value) => setState(() {
+                  _durationHours = value;
+                  _durationError = _exceedsSavedTime
+                      ? _savedTimeErrorText
+                      : null;
+                }),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _durationField(
+                controller: _minuteController,
+                options: minuteOptions,
+                suffix: "menit",
+                enabled: _durationFieldsEnabled,
+                onChanged: (value) => setState(() {
+                  _durationMinutes = value;
+                  _durationError = _exceedsSavedTime
+                      ? _savedTimeErrorText
+                      : null;
+                }),
+              ),
+            ),
+          ],
+        ),
       if (_durationError != null) ...[
         const SizedBox(height: 6),
         Text(
@@ -880,7 +961,39 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
     ];
   }
 
+  Widget _mahjongTile(String char, Color color, double angle) {
+    return Transform.rotate(
+      angle: angle,
+      child: Container(
+        width: 38,
+        height: 50,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF4F1E8),
+          borderRadius: BorderRadius.circular(7),
+          border: Border.all(color: const Color(0xFF2E7D5B), width: 2),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black38,
+              blurRadius: 6,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Text(
+          char,
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            color: color,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildHeader() {
+    if (_isMahjong) return _buildMahjongHeader();
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -932,6 +1045,80 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildMahjongHeader() {
+    return Container(
+      height: 96,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppSizes.radiusLarge),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0F2A44), Color(0xFF1E4F8F), Color(0xFF2E7D5B)],
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .15),
+              borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+            ),
+            child: const Icon(
+              Icons.sports_esports_rounded,
+              color: Colors.white,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Mulai Sesi",
+                  style: AppText.title.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  "Lengkapi detail untuk memulai permainan",
+                  style: AppText.caption.copyWith(color: Colors.white70),
+                ),
+              ],
+            ),
+          ),
+          _mahjongTile("發", const Color(0xFF1B8A4B), -.15),
+          const SizedBox(width: 6),
+          _mahjongTile("中", const Color(0xFFD32F2F), .05),
+          const SizedBox(width: 6),
+          _mahjongTile("●●", const Color(0xFF1E4F8F), .18),
+          const SizedBox(width: 16),
+          InkWell(
+            onTap: () => Navigator.of(context).pop(),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: .15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.close_rounded,
+                size: 18,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -999,6 +1186,71 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _stepper({
+    required int value,
+    required String unit,
+    required int step,
+    required int max,
+    required ValueChanged<int> onChanged,
+  }) {
+    final enabled = _durationFieldsEnabled;
+    Widget btn(IconData icon, bool canTap, VoidCallback onTap) {
+      return InkWell(
+        onTap: enabled && canTap ? onTap : null,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: enabled && canTap ? AppColors.primary : AppColors.border,
+            ),
+          ),
+          child: Icon(
+            icon,
+            size: 18,
+            color: enabled && canTap ? AppColors.primary : AppColors.textHint,
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          btn(
+            Icons.remove_rounded,
+            value > 0,
+            () => onChanged((value - step).clamp(0, max)),
+          ),
+          Expanded(
+            child: Column(
+              children: [
+                Text(
+                  "$value",
+                  style: AppText.title.copyWith(fontWeight: FontWeight.w700),
+                ),
+                Text(unit, style: AppText.caption),
+              ],
+            ),
+          ),
+          btn(
+            Icons.add_rounded,
+            value < max,
+            () => onChanged((value + step).clamp(0, max)),
+          ),
+        ],
       ),
     );
   }
@@ -1175,49 +1427,6 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
           style: AppText.body.copyWith(
             fontWeight: FontWeight.w600,
             color: selected ? AppColors.primary : AppColors.textSecondary,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildOptionsCard<T extends Object>(
-    BuildContext context, {
-    required Iterable<T> options,
-    required void Function(T) onSelected,
-    required String Function(T) labelOf,
-  }) {
-    return Align(
-      alignment: Alignment.topLeft,
-      child: Material(
-        color: AppColors.card,
-        elevation: 8,
-        borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-        child: Container(
-          width: 372,
-          constraints: const BoxConstraints(maxHeight: 220),
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: ListView.builder(
-            shrinkWrap: true,
-            padding: EdgeInsets.zero,
-            itemCount: options.length,
-            itemBuilder: (context, index) {
-              final option = options.elementAt(index);
-              return InkWell(
-                onTap: () => onSelected(option),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 12,
-                  ),
-                  child: Text(labelOf(option), style: AppText.body),
-                ),
-              );
-            },
           ),
         ),
       ),

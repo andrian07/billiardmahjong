@@ -14,6 +14,7 @@ import '../../settings/data/table_category_repository.dart';
 class PromoFormResult {
   final String name;
   final PromoType type;
+  final String tableType;
   final int value;
   final int? hourGained;
   final int? freeHour;
@@ -25,6 +26,7 @@ class PromoFormResult {
   const PromoFormResult({
     required this.name,
     required this.type,
+    this.tableType = 'billiard',
     required this.value,
     this.hourGained,
     this.freeHour,
@@ -61,6 +63,7 @@ class _PromoFormDialogState extends State<PromoFormDialog> {
     text: widget.promo?.freeHour != null ? "${widget.promo!.freeHour}" : "",
   );
   late PromoType _type = widget.promo?.type ?? PromoType.percentage;
+  late String _tableType = widget.promo?.tableType ?? 'billiard';
 
   late final Set<int> _selectedDays = {...?widget.promo?.validDays};
   late bool _useTimeWindow = widget.promo?.hasTimeWindow ?? false;
@@ -127,6 +130,7 @@ class _PromoFormDialogState extends State<PromoFormDialog> {
       PromoFormResult(
         name: _nameController.text.trim(),
         type: _type,
+        tableType: _tableType,
         value: parseThousands(_valueController.text) ?? 0,
         hourGained: _type == PromoType.fixed
             ? int.tryParse(_hourController.text.trim())
@@ -342,6 +346,10 @@ class _PromoFormDialogState extends State<PromoFormDialog> {
           ),
         ],
         const SizedBox(height: 18),
+        _label("Jenis Promo"),
+        const SizedBox(height: 8),
+        _buildTableTypeSelector(),
+        const SizedBox(height: 18),
         _label("Kategori Meja Berlaku (kosongkan = semua kategori)"),
         const SizedBox(height: 8),
         _buildCategorySelector(),
@@ -404,7 +412,8 @@ class _PromoFormDialogState extends State<PromoFormDialog> {
         ),
       );
     }
-    if (_categories.isEmpty) {
+    final categories = _categories.where((c) => c.type == _tableType).toList();
+    if (categories.isEmpty) {
       return Text(
         "Tidak ada kategori meja. Promo berlaku untuk semua.",
         style: AppText.caption,
@@ -414,7 +423,7 @@ class _PromoFormDialogState extends State<PromoFormDialog> {
       spacing: 8,
       runSpacing: 8,
       children: [
-        for (final c in _categories)
+        for (final c in categories)
           _selectableChip(
             label: c.name,
             active: _selectedCategories.contains(c.id),
@@ -455,6 +464,50 @@ class _PromoFormDialogState extends State<PromoFormDialog> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildTableTypeSelector() {
+    Widget option(String value, String label) {
+      final active = _tableType == value;
+      return Expanded(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+          onTap: () => setState(() {
+            if (_tableType == value) return;
+            _tableType = value;
+            _selectedCategories.clear();
+          }),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: active
+                  ? AppColors.primary.withValues(alpha: .15)
+                  : AppColors.background,
+              borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+              border: Border.all(
+                color: active ? AppColors.primary : AppColors.border,
+              ),
+            ),
+            child: Text(
+              label,
+              style: AppText.body.copyWith(
+                fontWeight: FontWeight.w600,
+                color: active ? AppColors.primary : AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        option('billiard', "Billiard"),
+        const SizedBox(width: 10),
+        option('mahjong', "Mahjong"),
+      ],
     );
   }
 

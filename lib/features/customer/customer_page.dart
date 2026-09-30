@@ -15,6 +15,7 @@ import '../../services/session_storage.dart';
 import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/app_layout.dart';
 import '../../shared/widgets/app_toast.dart';
+import '../../shared/widgets/ticket_preview.dart';
 import 'data/customer_repository.dart';
 import 'widgets/add_saldo_dialog.dart';
 import 'widgets/customer_detail_dialog.dart';
@@ -173,21 +174,28 @@ class _CustomerPageState extends State<CustomerPage> {
         "(${formatCurrency(result.nominal)})",
       );
 
+      final saldoReceipt = SaldoReceipt(
+        businessName: BusinessInfo.name,
+        businessAddress: BusinessInfo.address,
+        invoiceNumber: _buildSaldoInvoiceNumber(transaksiSaldoId),
+        customerName: result.customerName,
+        nominal: result.nominal,
+        discount: result.discount,
+        price: result.price,
+        paymentMethod: result.paymentMethodName,
+        date: DateTime.now(),
+        cashierName: createdBy,
+      );
       try {
-        await _receiptPrinter.printSaldoReceipt(
-          SaldoReceipt(
-            businessName: BusinessInfo.name,
-            businessAddress: BusinessInfo.address,
-            invoiceNumber: _buildSaldoInvoiceNumber(transaksiSaldoId),
-            customerName: result.customerName,
-            nominal: result.nominal,
-            discount: result.discount,
-            price: result.price,
-            paymentMethod: result.paymentMethodName,
-            date: DateTime.now(),
-            cashierName: createdBy,
-          ),
+        await _receiptPrinter.printSaldoReceipt(saldoReceipt);
+      } on ReceiptPrinterNotFoundException {
+        if (!mounted) return;
+        await TicketPreviewDialog.show(
+          context,
+          title: "PREVIEW NOTA SALDO - printer tidak ditemukan",
+          children: TicketPreviewContent.saldo(saldoReceipt),
         );
+        return;
       } on ReceiptPrinterException catch (e) {
         if (!mounted) return;
         AppToast.error(context, "Gagal mencetak nota: $e");
@@ -209,8 +217,7 @@ class _CustomerPageState extends State<CustomerPage> {
   Future<void> _confirmDelete(Customer customer) async {
     final confirmed = await _confirm(
       title: "Hapus Member?",
-      message:
-          "Apakah Anda yakin akan menghapus member \"${customer.name}\"?",
+      message: "Apakah Anda yakin akan menghapus member \"${customer.name}\"?",
       confirmLabel: "YA, HAPUS",
     );
     if (!confirmed) return;
@@ -722,110 +729,107 @@ class _CustomerRow extends StatelessWidget {
 
     return _row(
       no: Text("$no", style: cellStyle.copyWith(color: AppColors.textHint)),
-        id: Text(
-          c.idNumber.isNotEmpty ? c.idNumber : "-",
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: cellStyle.copyWith(color: AppColors.textSecondary),
+      id: Text(
+        c.idNumber.isNotEmpty ? c.idNumber : "-",
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: cellStyle.copyWith(color: AppColors.textSecondary),
+      ),
+      name: Text(
+        c.name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: cellStyle.copyWith(fontWeight: FontWeight.w600),
+      ),
+      phone: Text(
+        c.phone,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: cellStyle,
+      ),
+      address: Text(
+        c.address?.isNotEmpty == true ? c.address! : "-",
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: cellStyle,
+      ),
+      email: Text(
+        c.email?.isNotEmpty == true ? c.email! : "-",
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: cellStyle,
+      ),
+      saldo: Text(
+        formatCurrency(c.saldo),
+        textAlign: TextAlign.end,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: cellStyle.copyWith(
+          fontWeight: FontWeight.w600,
+          color: AppColors.primary,
         ),
-        name: Text(
-          c.name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: cellStyle.copyWith(fontWeight: FontWeight.w600),
-        ),
-        phone: Text(
-          c.phone,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: cellStyle,
-        ),
-        address: Text(
-          c.address?.isNotEmpty == true ? c.address! : "-",
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: cellStyle,
-        ),
-        email: Text(
-          c.email?.isNotEmpty == true ? c.email! : "-",
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: cellStyle,
-        ),
-        saldo: Text(
-          formatCurrency(c.saldo),
-          textAlign: TextAlign.end,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: cellStyle.copyWith(
-            fontWeight: FontWeight.w600,
-            color: AppColors.primary,
+      ),
+      point: Text(
+        formatThousands(c.point),
+        textAlign: TextAlign.end,
+        style: cellStyle.copyWith(fontWeight: FontWeight.w600),
+      ),
+      aksi: Center(
+        child: PopupMenuButton<String>(
+          tooltip: "Aksi",
+          color: AppColors.card,
+          icon: const Icon(
+            Icons.more_vert_rounded,
+            size: 18,
+            color: AppColors.textSecondary,
           ),
-        ),
-        point: Text(
-          formatThousands(c.point),
-          textAlign: TextAlign.end,
-          style: cellStyle.copyWith(fontWeight: FontWeight.w600),
-        ),
-        aksi: Center(
-          child: PopupMenuButton<String>(
-            tooltip: "Aksi",
-            color: AppColors.card,
-            icon: const Icon(
-              Icons.more_vert_rounded,
-              size: 18,
-              color: AppColors.textSecondary,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-              side: const BorderSide(color: AppColors.border),
-            ),
-            onSelected: (value) {
-              switch (value) {
-                case 'detail':
-                  onViewDetail?.call();
-                  break;
-                case 'saved_time':
-                  onViewSavedTime?.call();
-                  break;
-                case 'reset':
-                  onResetPassword?.call();
-                  break;
-                case 'delete':
-                  onDelete?.call();
-                  break;
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'detail',
-                child: _menuItem(
-                  Icons.receipt_long_rounded,
-                  "Detail Member",
-                ),
-              ),
-              PopupMenuItem(
-                value: 'saved_time',
-                child: _menuItem(
-                  Icons.hourglass_bottom_rounded,
-                  "Lihat Waktu Tersimpan",
-                ),
-              ),
-              PopupMenuItem(
-                value: 'reset',
-                child: _menuItem(Icons.lock_reset_rounded, "Reset Password"),
-              ),
-              PopupMenuItem(
-                value: 'delete',
-                child: _menuItem(
-                  Icons.delete_outline_rounded,
-                  "Hapus",
-                  color: AppColors.danger,
-                ),
-              ),
-            ],
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+            side: const BorderSide(color: AppColors.border),
           ),
+          onSelected: (value) {
+            switch (value) {
+              case 'detail':
+                onViewDetail?.call();
+                break;
+              case 'saved_time':
+                onViewSavedTime?.call();
+                break;
+              case 'reset':
+                onResetPassword?.call();
+                break;
+              case 'delete':
+                onDelete?.call();
+                break;
+            }
+          },
+          itemBuilder: (context) => [
+            PopupMenuItem(
+              value: 'detail',
+              child: _menuItem(Icons.receipt_long_rounded, "Detail Member"),
+            ),
+            PopupMenuItem(
+              value: 'saved_time',
+              child: _menuItem(
+                Icons.hourglass_bottom_rounded,
+                "Lihat Waktu Tersimpan",
+              ),
+            ),
+            PopupMenuItem(
+              value: 'reset',
+              child: _menuItem(Icons.lock_reset_rounded, "Reset Password"),
+            ),
+            PopupMenuItem(
+              value: 'delete',
+              child: _menuItem(
+                Icons.delete_outline_rounded,
+                "Hapus",
+                color: AppColors.danger,
+              ),
+            ),
+          ],
         ),
+      ),
     );
   }
 

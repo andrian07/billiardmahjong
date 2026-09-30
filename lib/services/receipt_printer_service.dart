@@ -20,6 +20,15 @@ class ReceiptPrinterException implements Exception {
   String toString() => message;
 }
 
+/// Thrown when no USB printer is connected at all — callers catch this
+/// separately to fall back to [TicketPreviewDialog] instead of an error toast.
+class ReceiptPrinterNotFoundException extends ReceiptPrinterException {
+  const ReceiptPrinterNotFoundException()
+    : super(
+        "Printer USB tidak ditemukan. Pastikan printer terhubung dan menyala.",
+      );
+}
+
 class ReceiptPrinterService {
   Future<void> printReceipt(Receipt receipt) {
     return _print(buildTicket: () => _buildTicket(receipt));
@@ -202,9 +211,7 @@ class ReceiptPrinterService {
 
   /// Shared USB scan/connect/print/disconnect flow — [buildTicket] builds
   /// whichever ticket layout the caller needs.
-  Future<void> _print({
-    required Future<Ticket> Function() buildTicket,
-  }) async {
+  Future<void> _print({required Future<Ticket> Function() buildTicket}) async {
     final manager = PrinterManager();
 
     try {
@@ -250,9 +257,7 @@ class ReceiptPrinterService {
     );
 
     if (printers.isEmpty) {
-      throw const ReceiptPrinterException(
-        "Printer USB tidak ditemukan. Pastikan printer terhubung dan menyala.",
-      );
+      throw const ReceiptPrinterNotFoundException();
     }
 
     await manager.connect(pickPrinter(printers, selection));
@@ -284,13 +289,13 @@ class ReceiptPrinterService {
     if (receipt.periods.isNotEmpty) {
       TicketLayout.sectionTitle(ticket, "Rincian Waktu");
       for (final period in receipt.periods) {
-        TicketLayout.row(ticket, period.label, formatCurrency(period.cost));
+        TicketLayout.row(ticket, period.label, formatCurrency(period.cost * 2));
         TicketLayout.row(ticket, "  Durasi", formatDuration(period.duration));
       }
     }
 
     ticket.separator(char: '-', linesAfter: 1);
-    TicketLayout.row(ticket, "Subtotal", formatCurrency(receipt.subtotal));
+    TicketLayout.row(ticket, "Subtotal", formatCurrency(receipt.subtotal * 2));
     if (receipt.promoName != null) {
       TicketLayout.row(ticket, "Promo", receipt.promoName!);
     }
@@ -298,11 +303,11 @@ class ReceiptPrinterService {
       TicketLayout.row(
         ticket,
         "Diskon",
-        "-${formatCurrency(receipt.discountAmount)}",
+        "-${formatCurrency(receipt.discountAmount * 2)}",
       );
     }
 
-    TicketLayout.grandTotal(ticket, "GRAND TOTAL", receipt.grandTotal);
+    TicketLayout.grandTotal(ticket, "GRAND TOTAL", receipt.grandTotal * 2);
 
     TicketLayout.row(ticket, "Bayar", receipt.paymentMethod);
     TicketLayout.footer(ticket, receipt.cashierName);

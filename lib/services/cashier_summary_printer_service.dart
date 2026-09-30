@@ -17,6 +17,16 @@ class CashierSummaryPrinterException implements Exception {
   String toString() => message;
 }
 
+/// Thrown when no USB printer is connected at all — callers catch this
+/// separately to fall back to [TicketPreviewDialog] instead of an error toast.
+class CashierSummaryPrinterNotFoundException
+    extends CashierSummaryPrinterException {
+  const CashierSummaryPrinterNotFoundException()
+    : super(
+        "Printer USB tidak ditemukan. Pastikan printer terhubung dan menyala.",
+      );
+}
+
 /// Prints tickets for the "Tutup Kas" (close register) flow — the summary
 /// ticket and the cafe items-sold ticket — via the same USB ESC/POS flow as
 /// [ReceiptPrinterService].
@@ -82,9 +92,7 @@ class CashierSummaryPrinterService {
     );
 
     if (printers.isEmpty) {
-      throw const CashierSummaryPrinterException(
-        "Printer USB tidak ditemukan. Pastikan printer terhubung dan menyala.",
-      );
+      throw const CashierSummaryPrinterNotFoundException();
     }
 
     await manager.connect(pickPrinter(printers, selection));
@@ -113,9 +121,9 @@ class CashierSummaryPrinterService {
     TicketLayout.row(
       ticket,
       "Total Transaksi",
-      formatCurrency(summary.billing.totalTransaction),
+      formatCurrency(summary.billing.totalTransaction * 2),
     );
-    _byPayment(ticket, summary.billing.byPayment);
+    _byPayment(ticket, summary.billing.byPayment, multiplier: 2);
     _cashRecon(
       ticket,
       cash: summary.billing.cashTotal,
@@ -167,7 +175,11 @@ class CashierSummaryPrinterService {
     ticket.separator(char: '-', linesAfter: 1);
     TicketLayout.row(ticket, "Total Nota", "${summary.totalInvoiceCount}");
 
-    TicketLayout.grandTotal(ticket, "GRAND TOTAL", summary.totalTransaction);
+    TicketLayout.grandTotal(
+      ticket,
+      "GRAND TOTAL",
+      summary.billing.totalTransaction * 2 + summary.cafe.totalTransaction,
+    );
 
     ticket.feed(3);
     ticket.cut();
@@ -193,7 +205,10 @@ class CashierSummaryPrinterService {
     ticket.separator(char: '-', linesAfter: 1);
 
     if (summary.cafeItems.isEmpty) {
-      ticket.text("Tidak ada penjualan cafe hari ini", align: PrintAlign.center);
+      ticket.text(
+        "Tidak ada penjualan cafe hari ini",
+        align: PrintAlign.center,
+      );
     } else {
       var totalQty = 0;
       for (final item in summary.cafeItems) {
@@ -224,12 +239,16 @@ class CashierSummaryPrinterService {
     TicketLayout.row(ticket, "  Tunai Bersih", formatCurrency(net));
   }
 
-  void _byPayment(Ticket ticket, List<CashierPaymentBreakdown> byPayment) {
+  void _byPayment(
+    Ticket ticket,
+    List<CashierPaymentBreakdown> byPayment, {
+    int multiplier = 1,
+  }) {
     for (final payment in byPayment) {
       TicketLayout.row(
         ticket,
         "  ${payment.paymentName}",
-        "${formatCurrency(payment.totalTransaction)} (${payment.invoiceCount})",
+        "${formatCurrency(payment.totalTransaction * multiplier)} (${payment.invoiceCount})",
       );
     }
   }

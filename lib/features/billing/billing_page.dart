@@ -12,6 +12,7 @@ import '../../services/receipt_printer_service.dart';
 import '../../services/session_storage.dart';
 import '../../shared/widgets/app_layout.dart';
 import '../../shared/widgets/app_toast.dart';
+import '../../shared/widgets/ticket_preview.dart';
 import '../../shared/widgets/pin_guard.dart';
 import 'data/billing_repository.dart';
 import 'data/invoice_repository.dart';
@@ -354,7 +355,17 @@ class _BillingPageState extends State<BillingPage> {
         result,
         cashierName: cashierName,
       );
-      await _receiptPrinter.printReceipt(receipt);
+      try {
+        await _receiptPrinter.printReceipt(receipt);
+      } on ReceiptPrinterNotFoundException {
+        if (!mounted) return;
+        await TicketPreviewDialog.show(
+          context,
+          title: "PREVIEW STRUK - printer tidak ditemukan",
+          children: TicketPreviewContent.billing(receipt),
+        );
+        return;
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(

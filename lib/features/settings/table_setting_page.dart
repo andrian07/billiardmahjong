@@ -19,8 +19,23 @@ class TableSettingPage extends StatefulWidget {
   State<TableSettingPage> createState() => _TableSettingPageState();
 }
 
-class _TableSettingPageState extends State<TableSettingPage> {
+class _TableSettingPageState extends State<TableSettingPage>
+    with SingleTickerProviderStateMixin {
   final _repository = TableSettingRepository();
+  late final TabController _tabController = TabController(length: 2, vsync: this)
+    ..addListener(() {
+      if (!_tabController.indexIsChanging && mounted) setState(() {});
+    });
+
+  String get _tabType => _tabController.index == 0 ? 'billiard' : 'mahjong';
+  List<TableSetting> get _visibleTables =>
+      _tables.where((t) => t.type == _tabType).toList();
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   List<TableSetting> _tables = [];
   bool _loading = true;
@@ -105,7 +120,15 @@ class _TableSettingPageState extends State<TableSettingPage> {
             child: _buildToolbar(),
           ),
           const Divider(height: 1, color: AppColors.divider),
-          if (!_loading && _error == null && _tables.isNotEmpty)
+          TabBar(
+            controller: _tabController,
+            labelColor: AppColors.primary,
+            unselectedLabelColor: AppColors.textSecondary,
+            indicatorColor: AppColors.primary,
+            tabs: const [Tab(text: "Billiard"), Tab(text: "Mahjong")],
+          ),
+          const Divider(height: 1, color: AppColors.divider),
+          if (!_loading && _error == null && _visibleTables.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(36, 14, 36, 6),
               child: _TableSettingRow.header(),
@@ -123,16 +146,17 @@ class _TableSettingPageState extends State<TableSettingPage> {
     if (_error != null) {
       return _buildErrorState(_error!);
     }
-    if (_tables.isEmpty) {
+    final tables = _visibleTables;
+    if (tables.isEmpty) {
       return _buildEmptyState();
     }
 
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-      itemCount: _tables.length,
+      itemCount: tables.length,
       separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
-        final table = _tables[index];
+        final table = tables[index];
         return _RowCard(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -177,7 +201,7 @@ class _TableSettingPageState extends State<TableSettingPage> {
             Text(
               _loading || _error != null
                   ? "Memuat data..."
-                  : "${_tables.length} meja terdaftar",
+                  : "${_visibleTables.length} meja ${_tabType == 'mahjong' ? 'mahjong' : 'billiard'} terdaftar",
               style: AppText.caption,
             ),
           ],

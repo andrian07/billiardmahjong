@@ -142,6 +142,7 @@ class _PromoPageState extends State<PromoPage> {
       await _repository.addPromo(
         name: result.name,
         type: result.type,
+        tableType: result.tableType,
         value: result.value,
         hourGained: result.hourGained,
         freeHour: result.freeHour,
@@ -171,6 +172,7 @@ class _PromoPageState extends State<PromoPage> {
         id: promo.id,
         name: result.name,
         type: result.type,
+        tableType: result.tableType,
         value: result.value,
         hourGained: result.hourGained,
         freeHour: result.freeHour,
@@ -667,7 +669,9 @@ class _PromoRow extends StatelessWidget {
   /// Nama kategori tempat promo ini berlaku, atau "Semua kategori" kalau
   /// tidak dibatasi. Fallback ke "#id" kalau nama kategori belum termuat.
   String _categoryLabel(Promo p) {
-    if (p.categoryIds.isEmpty) return "Semua kategori";
+    if (p.categoryIds.isEmpty) {
+      return p.tableType == 'mahjong' ? "Semua meja Mahjong" : "Semua meja Billiard";
+    }
     return p.categoryIds.map((id) => categoryNames[id] ?? "#$id").join(", ");
   }
 

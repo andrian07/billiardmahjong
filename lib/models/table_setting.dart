@@ -8,6 +8,9 @@ class TableSetting {
   final int? categoryId;
   final String? categoryName;
 
+  /// 'billiard' atau 'mahjong' (table_active.table_type).
+  final String type;
+
   const TableSetting({
     required this.id,
     required this.relay,
@@ -15,6 +18,7 @@ class TableSetting {
     required this.point,
     this.categoryId,
     this.categoryName,
+    this.type = 'billiard',
   });
 
   factory TableSetting.fromJson(Map<String, dynamic> json) {
@@ -37,6 +41,7 @@ class TableSetting {
       point: asInt(json['table_point']),
       categoryId: (categoryId != null && categoryId != 0) ? categoryId : null,
       categoryName: json['table_category_name']?.toString(),
+      type: json['table_type']?.toString() == 'mahjong' ? 'mahjong' : 'billiard',
     );
   }
 
@@ -58,6 +63,7 @@ class TableSetting {
       point: point ?? this.point,
       categoryId: categoryId,
       categoryName: categoryName,
+      type: type,
     );
   }
 }

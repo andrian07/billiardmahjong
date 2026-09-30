@@ -12,6 +12,7 @@ import '../../../models/transaction.dart';
 import '../../../services/receipt_printer_service.dart';
 import '../../../services/session_storage.dart';
 import '../../../shared/widgets/app_toast.dart';
+import '../../../shared/widgets/ticket_preview.dart';
 import '../../../shared/widgets/pin_guard.dart';
 import '../data/transaction_repository.dart';
 import 'edit_payment_dialog.dart';
@@ -161,45 +162,53 @@ class CafeTransactionListState extends State<CafeTransactionList> {
 
     setState(() => _reprintingId = transaction.id);
     try {
-      final detail = await _repository.getCafeTransactionDetail(
-        transaction.id,
+      final detail = await _repository.getCafeTransactionDetail(transaction.id);
+
+      final receipt = CafeReceipt(
+        businessName: BusinessInfo.name,
+        businessAddress: BusinessInfo.address,
+        invoiceNumber: detail.invoiceNumber,
+        date: detail.date,
+        table: detail.table != null ? "Meja ${detail.table}" : null,
+        customerName: detail.customerName,
+        items: [
+          for (final item in detail.items)
+            CafeReceiptItem(
+              name: item.name,
+              quantity: item.quantity,
+              price: item.price,
+              note: item.note,
+              addons: [
+                for (final addon in item.addons)
+                  CafeReceiptAddon(
+                    name: addon.name,
+                    quantity: addon.quantity,
+                    price: addon.price,
+                  ),
+              ],
+            ),
+        ],
+        subtotal: detail.subTotal,
+        discountPercent: detail.discount,
+        discountAmount: (detail.subTotal * detail.discount / 100).round(),
+        tax: detail.tax,
+        total: detail.totalBill,
+        paymentMethod: detail.paymentMethod,
+        cashierName: detail.createdBy,
+        isReprint: true,
       );
 
-      await _receiptPrinter.printCafeReceipt(
-        CafeReceipt(
-          businessName: BusinessInfo.name,
-          businessAddress: BusinessInfo.address,
-          invoiceNumber: detail.invoiceNumber,
-          date: detail.date,
-          table: detail.table != null ? "Meja ${detail.table}" : null,
-          customerName: detail.customerName,
-          items: [
-            for (final item in detail.items)
-              CafeReceiptItem(
-                name: item.name,
-                quantity: item.quantity,
-                price: item.price,
-                note: item.note,
-                addons: [
-                  for (final addon in item.addons)
-                    CafeReceiptAddon(
-                      name: addon.name,
-                      quantity: addon.quantity,
-                      price: addon.price,
-                    ),
-                ],
-              ),
-          ],
-          subtotal: detail.subTotal,
-          discountPercent: detail.discount,
-          discountAmount: (detail.subTotal * detail.discount / 100).round(),
-          tax: detail.tax,
-          total: detail.totalBill,
-          paymentMethod: detail.paymentMethod,
-          cashierName: detail.createdBy,
-          isReprint: true,
-        ),
-      );
+      try {
+        await _receiptPrinter.printCafeReceipt(receipt);
+      } on ReceiptPrinterNotFoundException {
+        if (!mounted) return;
+        await TicketPreviewDialog.show(
+          context,
+          title: "PREVIEW STRUK - printer tidak ditemukan",
+          children: TicketPreviewContent.cafe(receipt),
+        );
+        return;
+      }
 
       if (!mounted) return;
       AppToast.success(
@@ -395,11 +404,7 @@ class CafeTransactionListState extends State<CafeTransactionList> {
         const SizedBox(width: 6),
         Text("s/d", style: AppText.caption),
         const SizedBox(width: 6),
-        _dateBox(
-          label: "Sampai Tanggal",
-          value: _endDate,
-          onTap: _pickEndDate,
-        ),
+        _dateBox(label: "Sampai Tanggal", value: _endDate, onTap: _pickEndDate),
         if (_startDate != null || _endDate != null) ...[
           const SizedBox(width: 8),
           InkWell(
@@ -461,12 +466,13 @@ class CafeTransactionListState extends State<CafeTransactionList> {
             color: AppColors.danger,
           ),
           const SizedBox(height: 12),
-          Text(message, style: AppText.bodySecondary, textAlign: TextAlign.center),
-          const SizedBox(height: 12),
-          FilledButton(
-            onPressed: _load,
-            child: const Text("Coba Lagi"),
+          Text(
+            message,
+            style: AppText.bodySecondary,
+            textAlign: TextAlign.center,
           ),
+          const SizedBox(height: 12),
+          FilledButton(onPressed: _load, child: const Text("Coba Lagi")),
         ],
       ),
     );

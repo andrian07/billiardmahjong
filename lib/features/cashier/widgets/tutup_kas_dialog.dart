@@ -7,6 +7,7 @@ import '../../../core/utils/formatters.dart';
 import '../../../models/cashier_summary.dart';
 import '../../../services/cashier_summary_printer_service.dart';
 import '../../../shared/widgets/app_toast.dart';
+import '../../../shared/widgets/ticket_preview.dart';
 import '../data/cashier_repository.dart';
 
 /// "Tutup Kas" popup — shows the logged-in cashier's transactions for today
@@ -72,10 +73,24 @@ class _TutupKasDialogState extends State<TutupKasDialog> {
     setState(() => _printing = true);
 
     try {
-      await _printerService.printSummary(
-        summary,
-        cashierName: widget.cashierName,
-      );
+      try {
+        await _printerService.printSummary(
+          summary,
+          cashierName: widget.cashierName,
+        );
+      } on CashierSummaryPrinterNotFoundException {
+        if (!mounted) return;
+        setState(() => _printing = false);
+        await TicketPreviewDialog.show(
+          context,
+          title: "PREVIEW TUTUP KAS - printer tidak ditemukan",
+          children: TicketPreviewContent.cashierSummary(
+            summary,
+            widget.cashierName,
+          ),
+        );
+        return;
+      }
       if (!mounted) return;
       setState(() => _printing = false);
       AppToast.success(context, "Struk tutup kas berhasil dicetak");
@@ -93,10 +108,24 @@ class _TutupKasDialogState extends State<TutupKasDialog> {
     setState(() => _printingCafeItems = true);
 
     try {
-      await _printerService.printCafeItems(
-        summary,
-        cashierName: widget.cashierName,
-      );
+      try {
+        await _printerService.printCafeItems(
+          summary,
+          cashierName: widget.cashierName,
+        );
+      } on CashierSummaryPrinterNotFoundException {
+        if (!mounted) return;
+        setState(() => _printingCafeItems = false);
+        await TicketPreviewDialog.show(
+          context,
+          title: "PREVIEW ITEM CAFE - printer tidak ditemukan",
+          children: TicketPreviewContent.cafeItemsSold(
+            summary,
+            widget.cashierName,
+          ),
+        );
+        return;
+      }
       if (!mounted) return;
       setState(() => _printingCafeItems = false);
       AppToast.success(context, "Struk item cafe berhasil dicetak");
@@ -279,6 +308,7 @@ class _TutupKasDialogState extends State<TutupKasDialog> {
                 icon: Icons.table_bar_rounded,
                 title: "Billing",
                 summary: summary.billing,
+                multiplier: 2,
                 expenseTotal: summary.expenseTotalBilling,
                 netCash: summary.billingNetCash,
               ),
@@ -332,7 +362,10 @@ class _TutupKasDialogState extends State<TutupKasDialog> {
               style: AppText.body.copyWith(fontWeight: FontWeight.w700),
             ),
             Text(
-              formatCurrency(summary.totalTransaction),
+              formatCurrency(
+                summary.billing.totalTransaction * 2 +
+                    summary.cafe.totalTransaction,
+              ),
               style: AppText.title.copyWith(
                 color: AppColors.success,
                 fontWeight: FontWeight.w700,
@@ -434,6 +467,7 @@ class _TutupKasDialogState extends State<TutupKasDialog> {
     required CashierTransactionSummary summary,
     int? expenseTotal,
     int? netCash,
+    int multiplier = 1,
   }) {
     final showRecon = (expenseTotal ?? 0) > 0;
     return Container(
@@ -465,7 +499,10 @@ class _TutupKasDialogState extends State<TutupKasDialog> {
           const SizedBox(height: 8),
           _cardKv("Jumlah Nota", "${summary.invoiceCount}"),
           const SizedBox(height: 4),
-          _cardKv("Total Transaksi", formatCurrency(summary.totalTransaction)),
+          _cardKv(
+            "Total Transaksi",
+            formatCurrency(summary.totalTransaction * multiplier),
+          ),
           if (summary.byPayment.isNotEmpty) ...[
             const SizedBox(height: 8),
             const Divider(color: AppColors.divider, height: 1),
@@ -475,7 +512,7 @@ class _TutupKasDialogState extends State<TutupKasDialog> {
                 padding: const EdgeInsets.only(bottom: 4),
                 child: _cardKv(
                   "${payment.paymentName} (${payment.invoiceCount})",
-                  formatCurrency(payment.totalTransaction),
+                  formatCurrency(payment.totalTransaction * multiplier),
                   color: AppColors.textSecondary,
                 ),
               ),
@@ -504,7 +541,12 @@ class _TutupKasDialogState extends State<TutupKasDialog> {
     );
   }
 
-  Widget _cardKv(String label, String value, {Color? color, bool bold = false}) {
+  Widget _cardKv(
+    String label,
+    String value, {
+    Color? color,
+    bool bold = false,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [

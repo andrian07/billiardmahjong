@@ -15,6 +15,7 @@ import '../../services/session_storage.dart';
 import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/app_layout.dart';
 import '../../shared/widgets/app_toast.dart';
+import '../../shared/widgets/ticket_preview.dart';
 import '../product/data/product_repository.dart';
 import 'data/cafe_invoice_repository.dart';
 import 'data/cafe_repository.dart';
@@ -61,6 +62,7 @@ class _PosPageState extends State<PosPage> {
   /// cart is cleared/checked out.
   int? _activeKeepTransactionId;
   String? _activeKeepTransactionName;
+
   /// Snapshot (qty/note/addons) of each item as it was last persisted to the
   /// held transaction, so [_pendingKeepItems] can tell whether an item needs
   /// resending because ANYTHING changed — not just its quantity going up.
@@ -216,7 +218,9 @@ class _PosPageState extends State<PosPage> {
 
   bool _addonsMatch(List<CartAddon> a, List<CartAddon> b) {
     if (a.length != b.length) return false;
-    final aByProduct = {for (final addon in a) addon.product.id: addon.quantity};
+    final aByProduct = {
+      for (final addon in a) addon.product.id: addon.quantity,
+    };
     for (final addon in b) {
       if (aByProduct[addon.product.id] != addon.quantity) return false;
     }
@@ -289,7 +293,17 @@ class _PosPageState extends State<PosPage> {
       }
 
       if (!mounted) return;
-      await _receiptPrinter.printCafeReceipt(receipt);
+      try {
+        await _receiptPrinter.printCafeReceipt(receipt);
+      } on ReceiptPrinterNotFoundException {
+        if (!mounted) return;
+        await TicketPreviewDialog.show(
+          context,
+          title: "PREVIEW STRUK - printer tidak ditemukan",
+          children: TicketPreviewContent.cafe(receipt),
+        );
+        return;
+      }
     } catch (e) {
       if (!mounted) return;
       AppToast.error(context, "Gagal mencetak struk: $e");
@@ -996,7 +1010,9 @@ class _CartRow extends StatelessWidget {
                 ),
               ),
               Tooltip(
-                message: hasAddons ? "Edit item tambahan" : "Tambah item tambahan",
+                message: hasAddons
+                    ? "Edit item tambahan"
+                    : "Tambah item tambahan",
                 child: InkWell(
                   onTap: onEditAddons,
                   borderRadius: BorderRadius.circular(6),
