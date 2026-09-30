@@ -10,8 +10,8 @@ import '../../../shared/widgets/app_toast.dart';
 import '../data/cashier_repository.dart';
 
 /// "Pengeluaran" popup — the cashier logs a cash outlay during the shift
-/// (keterangan + nominal) and picks which drawer it comes out of: Billing
-/// or Cafe. At Tutup Kas the total is subtracted from that channel's CASH
+/// (keterangan + nominal) and picks which drawer it comes out of: Billiard,
+/// Mahjong, or Cafe. At Tutup Kas the total is subtracted from that channel's CASH
 /// figure (revenue / Grand Total stays put).
 ///
 /// Entries and their deletes are scoped to this cashier ([userId]) and
@@ -118,6 +118,10 @@ class _ExpenseDialogState extends State<ExpenseDialog> {
 
   int get _totalBilling => _expenses
       .where((e) => e.channel == ExpenseChannel.billing)
+      .fold(0, (s, e) => s + e.nominal);
+
+  int get _totalMahjong => _expenses
+      .where((e) => e.channel == ExpenseChannel.mahjong)
       .fold(0, (s, e) => s + e.nominal);
 
   int get _totalCafe => _expenses
@@ -247,7 +251,9 @@ class _ExpenseDialogState extends State<ExpenseDialog> {
           const SizedBox(height: 8),
           Row(
             children: [
-              _channelChip("Billing", ExpenseChannel.billing),
+              _channelChip("Billiard", ExpenseChannel.billing),
+              const SizedBox(width: 8),
+              _channelChip("Mahjong", ExpenseChannel.mahjong),
               const SizedBox(width: 8),
               _channelChip("Cafe", ExpenseChannel.cafe),
             ],
@@ -263,8 +269,9 @@ class _ExpenseDialogState extends State<ExpenseDialog> {
             style: AppText.body,
             textCapitalization: TextCapitalization.sentences,
             decoration: _fieldDecoration("mis. Beli galon, parkir, bensin"),
-            validator: (value) =>
-                (value == null || value.trim().isEmpty) ? "Isi keterangan" : null,
+            validator: (value) => (value == null || value.trim().isEmpty)
+                ? "Isi keterangan"
+                : null,
           ),
           const SizedBox(height: 16),
           Text(
@@ -313,7 +320,9 @@ class _ExpenseDialogState extends State<ExpenseDialog> {
                     elevation: 0,
                     textStyle: AppText.button,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+                      borderRadius: BorderRadius.circular(
+                        AppSizes.radiusMedium,
+                      ),
                     ),
                   ),
                 ),
@@ -395,7 +404,9 @@ class _ExpenseDialogState extends State<ExpenseDialog> {
           ),
         ),
         const SizedBox(height: 10),
-        _totalRow("Total Pengeluaran Billing", _totalBilling),
+        _totalRow("Total Pengeluaran Billiard", _totalBilling),
+        const SizedBox(height: 4),
+        _totalRow("Total Pengeluaran Mahjong", _totalMahjong),
         const SizedBox(height: 4),
         _totalRow("Total Pengeluaran Cafe", _totalCafe),
       ],
@@ -415,7 +426,7 @@ class _ExpenseDialogState extends State<ExpenseDialog> {
               border: Border.all(color: AppColors.border),
             ),
             child: Text(
-              e.channel == ExpenseChannel.cafe ? "Cafe" : "Billing",
+              expenseChannelLabel(e.channel),
               style: AppText.caption.copyWith(fontWeight: FontWeight.w600),
             ),
           ),

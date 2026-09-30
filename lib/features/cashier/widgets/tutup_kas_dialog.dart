@@ -306,7 +306,7 @@ class _TutupKasDialogState extends State<TutupKasDialog> {
             Expanded(
               child: _sectionCard(
                 icon: Icons.table_bar_rounded,
-                title: "Billing",
+                title: "Billiard",
                 summary: summary.billing,
                 multiplier: 2,
                 expenseTotal: summary.expenseTotalBilling,
@@ -314,6 +314,22 @@ class _TutupKasDialogState extends State<TutupKasDialog> {
               ),
             ),
             const SizedBox(width: 10),
+            Expanded(
+              child: _sectionCard(
+                icon: Icons.casino_outlined,
+                title: "Mahjong",
+                summary: summary.mahjong,
+                multiplier: 2,
+                expenseTotal: summary.expenseTotalMahjong,
+                netCash: summary.mahjongNetCash,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Expanded(
               child: _sectionCard(
                 icon: Icons.point_of_sale_rounded,
@@ -362,10 +378,7 @@ class _TutupKasDialogState extends State<TutupKasDialog> {
               style: AppText.body.copyWith(fontWeight: FontWeight.w700),
             ),
             Text(
-              formatCurrency(
-                summary.billing.totalTransaction * 2 +
-                    summary.cafe.totalTransaction,
-              ),
+              formatCurrency(summary.displayTotalTransaction),
               style: AppText.title.copyWith(
                 color: AppColors.success,
                 fontWeight: FontWeight.w700,
@@ -421,7 +434,7 @@ class _TutupKasDialogState extends State<TutupKasDialog> {
                       border: Border.all(color: AppColors.border),
                     ),
                     child: Text(
-                      e.channel == ExpenseChannel.cafe ? "Cafe" : "Billing",
+                      expenseChannelLabel(e.channel),
                       style: AppText.caption.copyWith(
                         fontWeight: FontWeight.w600,
                       ),

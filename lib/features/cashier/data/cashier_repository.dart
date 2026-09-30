@@ -46,7 +46,7 @@ class CashierRepository {
       "user_id": userId,
       "keterangan": keterangan,
       "nominal": nominal,
-      "channel": channel == ExpenseChannel.cafe ? "cafe" : "billing",
+      "channel": expenseChannelToString(channel),
     });
   }
 
@@ -67,10 +67,7 @@ class CashierRepository {
         .toList();
   }
 
-  Future<void> deleteExpense({
-    required int expenseId,
-    required int userId,
-  }) {
+  Future<void> deleteExpense({required int expenseId, required int userId}) {
     return _post(ApiEndpoints.deleteCashExpense, {
       "cash_expense_id": expenseId,
       "user_id": userId,

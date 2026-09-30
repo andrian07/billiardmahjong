@@ -91,10 +91,26 @@ class CafeItemSold {
 }
 
 /// Which cash drawer an expense is deducted from at Tutup Kas.
-enum ExpenseChannel { billing, cafe }
+/// [billing] = laci kas meja billiard.
+enum ExpenseChannel { billing, mahjong, cafe }
 
-ExpenseChannel expenseChannelFromString(String? raw) =>
-    raw == "cafe" ? ExpenseChannel.cafe : ExpenseChannel.billing;
+ExpenseChannel expenseChannelFromString(String? raw) => switch (raw) {
+  "cafe" => ExpenseChannel.cafe,
+  "mahjong" => ExpenseChannel.mahjong,
+  _ => ExpenseChannel.billing,
+};
+
+String expenseChannelToString(ExpenseChannel channel) => switch (channel) {
+  ExpenseChannel.cafe => "cafe",
+  ExpenseChannel.mahjong => "mahjong",
+  ExpenseChannel.billing => "billing",
+};
+
+String expenseChannelLabel(ExpenseChannel channel) => switch (channel) {
+  ExpenseChannel.cafe => "Cafe",
+  ExpenseChannel.mahjong => "Mahjong",
+  ExpenseChannel.billing => "Billiard",
+};
 
 /// One cash expense (keterangan + nominal) a cashier logged during the shift.
 /// At Tutup Kas its nominal is subtracted from the CASH total of [channel]
@@ -136,7 +152,10 @@ class CashExpense {
 class CashierClosingSummary {
   final DateTime businessDate;
   final int userId;
+
+  /// Transaksi meja billiard saja.
   final CashierTransactionSummary billing;
+  final CashierTransactionSummary mahjong;
   final CashierTransactionSummary cafe;
   final CashierTransactionSummary saldo;
   final List<CafeItemSold> cafeItems;
@@ -146,6 +165,7 @@ class CashierClosingSummary {
     required this.businessDate,
     required this.userId,
     required this.billing,
+    this.mahjong = CashierTransactionSummary.empty,
     required this.cafe,
     this.saldo = CashierTransactionSummary.empty,
     this.cafeItems = const [],
@@ -156,23 +176,41 @@ class CashierClosingSummary {
       .where((e) => e.channel == ExpenseChannel.billing)
       .fold(0, (sum, e) => sum + e.nominal);
 
+  int get expenseTotalMahjong => expenses
+      .where((e) => e.channel == ExpenseChannel.mahjong)
+      .fold(0, (sum, e) => sum + e.nominal);
+
   int get expenseTotalCafe => expenses
       .where((e) => e.channel == ExpenseChannel.cafe)
       .fold(0, (sum, e) => sum + e.nominal);
 
-  int get expenseTotal => expenseTotalBilling + expenseTotalCafe;
+  int get expenseTotal =>
+      expenseTotalBilling + expenseTotalMahjong + expenseTotalCafe;
 
   /// Tunai bersih per channel = pembayaran CASH − pengeluaran kas channel itu
   /// (boleh minus kalau pengeluaran melebihi tunai yang masuk).
   int get billingNetCash => billing.cashTotal - expenseTotalBilling;
+  int get mahjongNetCash => mahjong.cashTotal - expenseTotalMahjong;
   int get cafeNetCash => cafe.cashTotal - expenseTotalCafe;
 
-  /// Billing + cafe sales only — saldo top-ups are deposits, not revenue,
-  /// so they're shown as their own section rather than folded into this.
-  int get totalTransaction => billing.totalTransaction + cafe.totalTransaction;
+  /// Billiard + mahjong + cafe sales only — saldo top-ups are deposits, not
+  /// revenue, so they're shown as their own section rather than folded in.
+  int get totalTransaction =>
+      billing.totalTransaction +
+      mahjong.totalTransaction +
+      cafe.totalTransaction;
+
+  /// Nominal billiard + mahjong yang ditampilkan ×2 di nota/tutup kas (lihat
+  /// receipt_printer_service.dart), dipakai sebagai Grand Total tercetak.
+  int get displayTotalTransaction =>
+      (billing.totalTransaction + mahjong.totalTransaction) * 2 +
+      cafe.totalTransaction;
 
   int get totalInvoiceCount =>
-      billing.invoiceCount + cafe.invoiceCount + saldo.invoiceCount;
+      billing.invoiceCount +
+      mahjong.invoiceCount +
+      cafe.invoiceCount +
+      saldo.invoiceCount;
 
   factory CashierClosingSummary.fromJson(Map<String, dynamic> json) {
     int asInt(dynamic value) {
@@ -181,6 +219,7 @@ class CashierClosingSummary {
     }
 
     final billingJson = json['billing'];
+    final mahjongJson = json['mahjong'];
     final cafeJson = json['cafe'];
     final saldoJson = json['saldo'];
     final cafeItemsJson = json['cafe_items'];
@@ -193,6 +232,9 @@ class CashierClosingSummary {
       userId: asInt(json['user_id']),
       billing: billingJson is Map<String, dynamic>
           ? CashierTransactionSummary.fromJson(billingJson)
+          : CashierTransactionSummary.empty,
+      mahjong: mahjongJson is Map<String, dynamic>
+          ? CashierTransactionSummary.fromJson(mahjongJson)
           : CashierTransactionSummary.empty,
       cafe: cafeJson is Map<String, dynamic>
           ? CashierTransactionSummary.fromJson(cafeJson)

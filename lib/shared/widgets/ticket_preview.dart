@@ -347,7 +347,7 @@ class TicketPreviewContent {
       TicketPreviewLayout.center(formatFullDate(summary.businessDate)),
       TicketPreviewLayout.separator(char: '='),
       TicketPreviewLayout.row("Kasir", cashierName),
-      TicketPreviewLayout.sectionTitle("Billing"),
+      TicketPreviewLayout.sectionTitle("Billiard"),
       TicketPreviewLayout.row("Jumlah Nota", "${summary.billing.invoiceCount}"),
       TicketPreviewLayout.row(
         "Total Transaksi",
@@ -358,6 +358,18 @@ class TicketPreviewContent {
         cash: summary.billing.cashTotal,
         expense: summary.expenseTotalBilling,
         net: summary.billingNetCash,
+      ),
+      TicketPreviewLayout.sectionTitle("Mahjong"),
+      TicketPreviewLayout.row("Jumlah Nota", "${summary.mahjong.invoiceCount}"),
+      TicketPreviewLayout.row(
+        "Total Transaksi",
+        formatCurrency(summary.mahjong.totalTransaction * 2),
+      ),
+      ..._byPayment(summary.mahjong.byPayment, multiplier: 2),
+      ..._cashRecon(
+        cash: summary.mahjong.cashTotal,
+        expense: summary.expenseTotalMahjong,
+        net: summary.mahjongNetCash,
       ),
       TicketPreviewLayout.sectionTitle("Cafe / POS"),
       TicketPreviewLayout.row("Jumlah Nota", "${summary.cafe.invoiceCount}"),
@@ -382,7 +394,11 @@ class TicketPreviewContent {
         TicketPreviewLayout.sectionTitle("Pengeluaran Kas"),
         for (final e in summary.expenses)
           TicketPreviewLayout.row(
-            "${e.channel == ExpenseChannel.cafe ? "[Cafe] " : "[Bil] "}${e.keterangan}",
+            "${switch (e.channel) {
+              ExpenseChannel.cafe => "[Cafe] ",
+              ExpenseChannel.mahjong => "[Mjg] ",
+              ExpenseChannel.billing => "[Bil] ",
+            }}${e.keterangan}",
             "-${formatCurrency(e.nominal)}",
           ),
         TicketPreviewLayout.row(
@@ -394,7 +410,7 @@ class TicketPreviewContent {
       TicketPreviewLayout.row("Total Nota", "${summary.totalInvoiceCount}"),
       TicketPreviewLayout.grandTotal(
         "GRAND TOTAL",
-        summary.billing.totalTransaction * 2 + summary.cafe.totalTransaction,
+        summary.displayTotalTransaction,
       ),
     ];
   }

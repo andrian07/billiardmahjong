@@ -116,7 +116,7 @@ class CashierSummaryPrinterService {
 
     TicketLayout.row(ticket, "Kasir", cashierName);
 
-    TicketLayout.sectionTitle(ticket, "Billing");
+    TicketLayout.sectionTitle(ticket, "Billiard");
     TicketLayout.row(ticket, "Jumlah Nota", "${summary.billing.invoiceCount}");
     TicketLayout.row(
       ticket,
@@ -129,6 +129,21 @@ class CashierSummaryPrinterService {
       cash: summary.billing.cashTotal,
       expense: summary.expenseTotalBilling,
       net: summary.billingNetCash,
+    );
+
+    TicketLayout.sectionTitle(ticket, "Mahjong");
+    TicketLayout.row(ticket, "Jumlah Nota", "${summary.mahjong.invoiceCount}");
+    TicketLayout.row(
+      ticket,
+      "Total Transaksi",
+      formatCurrency(summary.mahjong.totalTransaction * 2),
+    );
+    _byPayment(ticket, summary.mahjong.byPayment, multiplier: 2);
+    _cashRecon(
+      ticket,
+      cash: summary.mahjong.cashTotal,
+      expense: summary.expenseTotalMahjong,
+      net: summary.mahjongNetCash,
     );
 
     TicketLayout.sectionTitle(ticket, "Cafe / POS");
@@ -158,7 +173,11 @@ class CashierSummaryPrinterService {
     if (summary.expenses.isNotEmpty) {
       TicketLayout.sectionTitle(ticket, "Pengeluaran Kas");
       for (final e in summary.expenses) {
-        final tag = e.channel == ExpenseChannel.cafe ? "[Cafe] " : "[Bil] ";
+        final tag = switch (e.channel) {
+          ExpenseChannel.cafe => "[Cafe] ",
+          ExpenseChannel.mahjong => "[Mjg] ",
+          ExpenseChannel.billing => "[Bil] ",
+        };
         TicketLayout.row(
           ticket,
           "$tag${e.keterangan}",
@@ -178,7 +197,7 @@ class CashierSummaryPrinterService {
     TicketLayout.grandTotal(
       ticket,
       "GRAND TOTAL",
-      summary.billing.totalTransaction * 2 + summary.cafe.totalTransaction,
+      summary.displayTotalTransaction,
     );
 
     ticket.feed(3);
