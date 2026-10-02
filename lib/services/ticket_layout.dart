@@ -30,7 +30,7 @@ class TicketLayout {
       style: const PrintTextStyle(bold: true),
     );
     ticket.text(businessAddress, align: PrintAlign.center);
-    ticket.separator(char: '=', linesAfter: 1);
+    separator(ticket, char: '=', linesAfter: 1);
     ticket.text(
       invoiceNumber,
       align: PrintAlign.center,
@@ -47,15 +47,39 @@ class TicketLayout {
         style: const PrintTextStyle(bold: true),
       );
     }
-    ticket.separator(char: '=', linesAfter: 1);
+    separator(ticket, char: '=', linesAfter: 1);
   }
 
-  /// A plain label/value row — never bold, see class doc.
+  /// Lebar kertas 58mm = 32 karakter (font normal). Semua baris dibuat dari teks biasa yang
+  /// di-pad spasi - TIDAK memakai ticket.row (posisi absolut ESC $), karena printer ini tidak
+  /// mendukungnya sehingga kolom menempel & muncul karakter sampah.
+  static const int width = 32;
+
+  static void separator(
+    Ticket ticket, {
+    String char = '-',
+    int linesAfter = 0,
+  }) {
+    ticket.separator(char: char, length: width, linesAfter: linesAfter);
+  }
+
+  /// Baris label kiri / nilai kanan dalam 1 baris teks biasa (label dibungkus kalau kepanjangan).
   static void row(Ticket ticket, String label, String value) {
-    ticket.row([
-      PrintColumn(text: label, flex: 4),
-      PrintColumn(text: value, flex: 5, align: PrintAlign.right),
-    ]);
+    final v = value.length >= width ? value.substring(0, width) : value;
+    final room = width - v.length - 1;
+    if (room < 1) {
+      ticket.text(label);
+      ticket.text(v, align: PrintAlign.right);
+      return;
+    }
+    final first = label.length <= room ? label : label.substring(0, room);
+    ticket.text('${first.padRight(room)} $v');
+    var rest = label.length <= room ? '' : label.substring(room);
+    while (rest.isNotEmpty) {
+      final n = rest.length <= width ? rest.length : width;
+      ticket.text(rest.substring(0, n));
+      rest = rest.substring(n);
+    }
   }
 
   static void sectionTitle(Ticket ticket, String title) {
@@ -66,7 +90,7 @@ class TicketLayout {
   /// The final amount, set apart and enlarged so it's unmistakable —
   /// entirely via full-line text, never a row (see class doc).
   static void grandTotal(Ticket ticket, String label, int amount) {
-    ticket.separator(char: '=', linesAfter: 1);
+    separator(ticket, char: '=', linesAfter: 1);
     ticket.text(label, style: const PrintTextStyle(bold: true));
     ticket.text(
       formatCurrency(amount),
@@ -77,7 +101,7 @@ class TicketLayout {
         width: TextSize.size2,
       ),
     );
-    ticket.separator(char: '=', linesAfter: 1);
+    separator(ticket, char: '=', linesAfter: 1);
   }
 
   static void footer(Ticket ticket, String cashierName) {

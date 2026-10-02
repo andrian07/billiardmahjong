@@ -82,7 +82,7 @@ class ReceiptPrinterService {
     required int durationHours,
     required String roomLabel,
   }) async {
-    final ticket = await Ticket.create(PaperSize.mm80);
+    final ticket = await Ticket.create(PaperSize.mm58);
 
     ticket.text(
       "BOOKING ROOM",
@@ -93,7 +93,7 @@ class ReceiptPrinterService {
       "Masuk ${formatFullDate(DateTime.now())} ${formatClock(DateTime.now())}",
       align: PrintAlign.center,
     );
-    ticket.separator(char: '=', linesAfter: 1);
+    TicketLayout.separator(ticket, char: '=', linesAfter: 1);
 
     TicketLayout.row(ticket, "Nama", customerName);
     TicketLayout.row(ticket, "Hari", formatWeekdayFullDate(start));
@@ -101,7 +101,7 @@ class ReceiptPrinterService {
     TicketLayout.row(ticket, "Jumlah Jam", "$durationHours jam");
     TicketLayout.row(ticket, "Ruangan", roomLabel);
 
-    ticket.separator(char: '=', linesAfter: 1);
+    TicketLayout.separator(ticket, char: '=', linesAfter: 1);
     ticket.feed(3);
     ticket.cut();
 
@@ -164,7 +164,7 @@ class ReceiptPrinterService {
   }
 
   Future<Ticket> _buildTestTicket() async {
-    final ticket = await Ticket.create(PaperSize.mm80);
+    final ticket = await Ticket.create(PaperSize.mm58);
     final now = DateTime.now();
 
     ticket.text(
@@ -176,13 +176,13 @@ class ReceiptPrinterService {
         width: TextSize.size2,
       ),
     );
-    ticket.separator(char: '=', linesAfter: 1);
+    TicketLayout.separator(ticket, char: '=', linesAfter: 1);
     ticket.text("Nota dummy - bukan transaksi", align: PrintAlign.center);
     ticket.text(
       "${formatFullDate(now)}  ${formatClock(now)}",
       align: PrintAlign.center,
     );
-    ticket.separator(char: '=', linesAfter: 1);
+    TicketLayout.separator(ticket, char: '=', linesAfter: 1);
 
     TicketLayout.row(ticket, "Meja", "Meja 01");
     TicketLayout.row(ticket, "Durasi", "1 jam");
@@ -193,7 +193,7 @@ class ReceiptPrinterService {
       "  1 x ${formatCurrency(15000)}",
       formatCurrency(15000),
     );
-    ticket.separator(char: '-', linesAfter: 1);
+    TicketLayout.separator(ticket, char: '-', linesAfter: 1);
     TicketLayout.row(ticket, "Subtotal", formatCurrency(15000));
     TicketLayout.grandTotal(ticket, "GRAND TOTAL", 15000);
     TicketLayout.row(ticket, "Bayar", "Tunai");
@@ -266,7 +266,7 @@ class ReceiptPrinterService {
   }
 
   Future<Ticket> _buildTicket(Receipt receipt) async {
-    final ticket = await Ticket.create(PaperSize.mm80);
+    final ticket = await Ticket.create(PaperSize.mm58);
 
     TicketLayout.header(
       ticket,
@@ -294,7 +294,7 @@ class ReceiptPrinterService {
       }
     }
 
-    ticket.separator(char: '-', linesAfter: 1);
+    TicketLayout.separator(ticket, char: '-', linesAfter: 1);
     TicketLayout.row(ticket, "Subtotal", formatCurrency(receipt.subtotal * 2));
     if (receipt.promoName != null) {
       TicketLayout.row(ticket, "Promo", receipt.promoName!);
@@ -316,7 +316,7 @@ class ReceiptPrinterService {
   }
 
   Future<Ticket> _buildCafeTicket(CafeReceipt receipt) async {
-    final ticket = await Ticket.create(PaperSize.mm80);
+    final ticket = await Ticket.create(PaperSize.mm58);
 
     TicketLayout.header(
       ticket,
@@ -358,7 +358,7 @@ class ReceiptPrinterService {
       }
     }
 
-    ticket.separator(char: '-', linesAfter: 1);
+    TicketLayout.separator(ticket, char: '-', linesAfter: 1);
     TicketLayout.row(ticket, "Subtotal", formatCurrency(receipt.subtotal));
     if (receipt.discountAmount > 0) {
       TicketLayout.row(
@@ -380,7 +380,7 @@ class ReceiptPrinterService {
   }
 
   Future<Ticket> _buildSaldoTicket(SaldoReceipt receipt) async {
-    final ticket = await Ticket.create(PaperSize.mm80);
+    final ticket = await Ticket.create(PaperSize.mm58);
 
     TicketLayout.header(
       ticket,
@@ -409,7 +409,7 @@ class ReceiptPrinterService {
     String? customerName,
     List<CartItem> items,
   ) async {
-    final ticket = await Ticket.create(PaperSize.mm80);
+    final ticket = await Ticket.create(PaperSize.mm58);
     final now = DateTime.now();
 
     ticket.text(
@@ -417,7 +417,7 @@ class ReceiptPrinterService {
       align: PrintAlign.center,
       style: const PrintTextStyle(bold: true),
     );
-    ticket.separator(char: '=', linesAfter: 1);
+    TicketLayout.separator(ticket, char: '=', linesAfter: 1);
 
     final name = customerName?.trim();
     TicketLayout.row(
@@ -427,7 +427,7 @@ class ReceiptPrinterService {
     );
     TicketLayout.row(ticket, "Kode", keepCode);
     ticket.text("${formatFullDate(now)}  ${formatClock(now)}");
-    ticket.separator(char: '=', linesAfter: 1);
+    TicketLayout.separator(ticket, char: '=', linesAfter: 1);
 
     for (final item in items) {
       ticket.text(
@@ -444,7 +444,7 @@ class ReceiptPrinterService {
       ticket.feed(1);
     }
 
-    ticket.separator(char: '=', linesAfter: 1);
+    TicketLayout.separator(ticket, char: '=', linesAfter: 1);
     ticket.feed(3);
     ticket.cut();
 

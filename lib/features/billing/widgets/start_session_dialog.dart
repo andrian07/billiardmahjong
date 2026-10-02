@@ -176,10 +176,10 @@ class _StartSessionDialogState extends State<StartSessionDialog> {
         _occupiedElsewhere = occupied;
         _loading = false;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
-        _loadError = "Gagal memuat data member/promo.";
+        _loadError = "Gagal memuat data member/promo.\n$e";
         _loading = false;
       });
     }

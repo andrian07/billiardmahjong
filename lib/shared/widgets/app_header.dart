@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/constants/app_sizes.dart';
+import '../../core/navigation/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text.dart';
 import '../../features/attendance/widgets/absensi_scan_dialog.dart';
@@ -416,10 +417,14 @@ class _AppHeaderState extends State<AppHeader>
     final cashierName = session?['username']?.toString() ?? "Kasir";
 
     if (!context.mounted) return;
-    showDialog(
+    // dialog pop(true) setelah struk tutup kas selesai dicetak/dipreview -> langsung logout
+    final done = await showDialog<bool>(
       context: context,
       builder: (_) => TutupKasDialog(userId: userId, cashierName: cashierName),
     );
+    if (done == true && context.mounted) {
+      await navigateToMenu(context, 'logout');
+    }
   }
 
   Future<void> _resetLampu(BuildContext context) async {

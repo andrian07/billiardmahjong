@@ -309,7 +309,10 @@ class _PaymentDialogState extends State<PaymentDialog> {
       final today = DateTime.now().weekday; // 1=Senin..7=Minggu
       if (!promo.validDays!.contains(today)) {
         final days = promo.validDays!.map((d) => weekdayLabels[d]).join(", ");
-        AppToast.error(context, "Promo \"${promo.name}\" hanya berlaku hari $days.");
+        AppToast.error(
+          context,
+          "Promo \"${promo.name}\" hanya berlaku hari $days.",
+        );
         setState(() {});
         return;
       }
@@ -340,7 +343,8 @@ class _PaymentDialogState extends State<PaymentDialog> {
       // valid_time_start bisa lebih besar dari valid_time_end untuk jendela yang melewati tengah
       // malam (mis. 22 s/d 4) - digeser relatif ke validTimeStart lalu dibungkus modulo 24 jam,
       // sama persis dengan Billing_model::validate_promo_schedule() di backend.
-      final windowLength = (promo.validTimeEnd! - promo.validTimeStart! + 24) % 24;
+      final windowLength =
+          (promo.validTimeEnd! - promo.validTimeStart! + 24) % 24;
       final shiftedStart = (startHod - promo.validTimeStart! + 24) % 24;
       final shiftedEnd = shiftedStart + (endHod - startHod);
       if (shiftedStart > windowLength || shiftedEnd > windowLength) {
@@ -431,6 +435,11 @@ class _PaymentDialogState extends State<PaymentDialog> {
       final paidBy = int.tryParse(session?['id']?.toString() ?? "") ?? 0;
       final now = DateTime.now();
       final endAt = widget.table.endAt;
+      // Timer: waktu main berhenti di akhir durasi, bukan di saat dibayar - telat bayar
+      // tidak ikut dihitung sebagai waktu main (nota & durasi tersimpan).
+      final playEnd = (_isTimerMode && endAt != null && endAt.isBefore(now))
+          ? endAt
+          : now;
 
       // ref idempoten untuk konfirmasi PIN member (Potong Saldo + member). Sama
       // dipakai pada percobaan pertama & percobaan ulang setelah disetujui.
@@ -440,9 +449,9 @@ class _PaymentDialogState extends State<PaymentDialog> {
         tableId: widget.table.id,
         mode: widget.table.sessionType,
         startTime: startAt,
-        endTime: now,
-        duration: now.isAfter(startAt)
-            ? now.difference(startAt)
+        endTime: playEnd,
+        duration: playEnd.isAfter(startAt)
+            ? playEnd.difference(startAt)
             : Duration.zero,
         subTotal: calculation.totalBilling,
         tax: calculation.totalTax,
@@ -767,10 +776,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
                 ),
                 items: [
                   for (final method in _visiblePaymentMethods)
-                    DropdownMenuItem(
-                      value: method,
-                      child: Text(method.name),
-                    ),
+                    DropdownMenuItem(value: method, child: Text(method.name)),
                 ],
                 // terkunci untuk sesi "pakai waktu tersimpan" (Potong Waktu) atau
                 // "Potong Saldo di awal" bila tagihan <= yang dibayar di muka.
@@ -801,7 +807,9 @@ class _PaymentDialogState extends State<PaymentDialog> {
               const SizedBox(height: 12),
               _buildPrepaidNote(),
             ],
-            if (_isTimerMode && _selectedCustomerId != null && _checkingTimeSave) ...[
+            if (_isTimerMode &&
+                _selectedCustomerId != null &&
+                _checkingTimeSave) ...[
               const SizedBox(height: 20),
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 10),
@@ -904,7 +912,11 @@ class _PaymentDialogState extends State<PaymentDialog> {
         children: [
           Row(
             children: [
-              const Icon(Icons.verified_rounded, size: 15, color: AppColors.info),
+              const Icon(
+                Icons.verified_rounded,
+                size: 15,
+                color: AppColors.info,
+              ),
               const SizedBox(width: 6),
               Text(
                 "Sudah dibayar di muka dari saldo: ${formatCurrency(prepaid)}",
@@ -1044,11 +1056,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
           if (_timerExpired)
             Row(
               children: [
-                Icon(
-                  Icons.block_rounded,
-                  size: 16,
-                  color: AppColors.textHint,
-                ),
+                Icon(Icons.block_rounded, size: 16, color: AppColors.textHint),
                 const SizedBox(width: 8),
                 Text(
                   "Waktu sudah habis — otomatis Tidak",
@@ -1059,13 +1067,9 @@ class _PaymentDialogState extends State<PaymentDialog> {
           else
             Row(
               children: [
-                Expanded(
-                  child: _saveTimeOption(label: "Ya", value: true),
-                ),
+                Expanded(child: _saveTimeOption(label: "Ya", value: true)),
                 const SizedBox(width: 10),
-                Expanded(
-                  child: _saveTimeOption(label: "Tidak", value: false),
-                ),
+                Expanded(child: _saveTimeOption(label: "Tidak", value: false)),
               ],
             ),
         ],

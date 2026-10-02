@@ -104,7 +104,7 @@ class CashierSummaryPrinterService {
     CashierClosingSummary summary,
     String cashierName,
   ) async {
-    final ticket = await Ticket.create(PaperSize.mm80);
+    final ticket = await Ticket.create(PaperSize.mm58);
 
     ticket.text(
       "TUTUP KAS",
@@ -112,7 +112,7 @@ class CashierSummaryPrinterService {
       style: const PrintTextStyle(bold: true),
     );
     ticket.text(formatFullDate(summary.businessDate), align: PrintAlign.center);
-    ticket.separator(char: '=', linesAfter: 1);
+    TicketLayout.separator(ticket, char: '=', linesAfter: 1);
 
     TicketLayout.row(ticket, "Kasir", cashierName);
 
@@ -191,7 +191,7 @@ class CashierSummaryPrinterService {
       );
     }
 
-    ticket.separator(char: '-', linesAfter: 1);
+    TicketLayout.separator(ticket, char: '-', linesAfter: 1);
     TicketLayout.row(ticket, "Total Nota", "${summary.totalInvoiceCount}");
 
     TicketLayout.grandTotal(
@@ -210,7 +210,7 @@ class CashierSummaryPrinterService {
     CashierClosingSummary summary,
     String cashierName,
   ) async {
-    final ticket = await Ticket.create(PaperSize.mm80);
+    final ticket = await Ticket.create(PaperSize.mm58);
 
     ticket.text(
       "ITEM CAFE TERJUAL",
@@ -218,10 +218,10 @@ class CashierSummaryPrinterService {
       style: const PrintTextStyle(bold: true),
     );
     ticket.text(formatFullDate(summary.businessDate), align: PrintAlign.center);
-    ticket.separator(char: '=', linesAfter: 1);
+    TicketLayout.separator(ticket, char: '=', linesAfter: 1);
 
     TicketLayout.row(ticket, "Kasir", cashierName);
-    ticket.separator(char: '-', linesAfter: 1);
+    TicketLayout.separator(ticket, char: '-', linesAfter: 1);
 
     if (summary.cafeItems.isEmpty) {
       ticket.text(
@@ -234,7 +234,7 @@ class CashierSummaryPrinterService {
         TicketLayout.row(ticket, item.productName, "${item.quantity}");
         totalQty += item.quantity;
       }
-      ticket.separator(char: '-', linesAfter: 1);
+      TicketLayout.separator(ticket, char: '-', linesAfter: 1);
       TicketLayout.row(ticket, "Total Item", "$totalQty");
     }
 

@@ -16,7 +16,12 @@ class InvoiceRepository {
   }) {
     final now = DateTime.now();
     final start = table.startAt ?? now;
-    final duration = now.difference(start);
+    // Timer: nota memakai akhir durasi (bukan jam bayar) kalau bayar setelah timer habis.
+    final timerEnd = table.sessionType == SessionType.timer
+        ? table.endAt
+        : null;
+    final end = (timerEnd != null && timerEnd.isBefore(now)) ? timerEnd : now;
+    final duration = end.difference(start);
 
     _localSequence++;
 
@@ -29,7 +34,7 @@ class InvoiceRepository {
         periods: const [],
         date: now,
         startAt: start,
-        endAt: now,
+        endAt: end,
         totalDuration: duration.isNegative ? Duration.zero : duration,
         subtotal: payment.subtotal,
         discountAmount: payment.discountAmount,

@@ -89,11 +89,13 @@ class _TutupKasDialogState extends State<TutupKasDialog> {
             widget.cashierName,
           ),
         );
+        if (mounted) Navigator.of(context).pop(true);
         return;
       }
       if (!mounted) return;
       setState(() => _printing = false);
       AppToast.success(context, "Struk tutup kas berhasil dicetak");
+      Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _printing = false);
