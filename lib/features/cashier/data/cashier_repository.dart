@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 
 import '../../../core/constants/api_endpoints.dart';
+import '../../../core/utils/formatters.dart';
 import '../../../models/cashier_summary.dart';
 
 class CashierRepositoryException implements Exception {
@@ -19,9 +20,14 @@ class CashierRepositoryException implements Exception {
 class CashierRepository {
   final Dio _dio = Dio();
 
-  Future<CashierClosingSummary> getTodaySummary({required int userId}) async {
+  /// [date] null = hari ini; diisi = tutup kas untuk hari bisnis tanggal itu.
+  Future<CashierClosingSummary> getTodaySummary({
+    required int userId,
+    DateTime? date,
+  }) async {
     final data = await _post(ApiEndpoints.transactionTodayByCashier, {
       "user_id": userId,
+      if (date != null) "date": formatApiDate(date),
     });
 
     final result = data['result'];

@@ -268,7 +268,8 @@ class BillingRepository {
     });
   }
 
-  Future<void> submitPayment({
+  /// Mengembalikan nomor nota asli dari backend (null kalau server lama tidak mengirimnya).
+  Future<String?> submitPayment({
     required String tableId,
     required SessionType? mode,
     required DateTime startTime,
@@ -305,10 +306,8 @@ class BillingRepository {
       "created_by": createdBy,
       "paid_by": "$paidBy",
       if (saveTime != null) "save_time": saveTime ? "Y" : "N",
-      if (usedSavedTime != null)
-        "used_save_time": usedSavedTime ? "Y" : "N",
-      if (memberApprovalRef != null)
-        "member_approval_ref": memberApprovalRef,
+      if (usedSavedTime != null) "used_save_time": usedSavedTime ? "Y" : "N",
+      if (memberApprovalRef != null) "member_approval_ref": memberApprovalRef,
     });
 
     // Potong Saldo + member: backend menahan pembayaran sampai member konfirmasi PIN
@@ -319,6 +318,9 @@ class BillingRepository {
         approval is Map<String, dynamic> ? approval : null,
       );
     }
+
+    final invoice = data['invoice_number']?.toString();
+    return (invoice != null && invoice.isNotEmpty) ? invoice : null;
   }
 
   Future<Map<String, dynamic>> _post(

@@ -34,6 +34,8 @@ class _TutupKasDialogState extends State<TutupKasDialog> {
   bool _loading = true;
   String? _error;
   CashierClosingSummary? _summary;
+  // hari bisnis: jam 00:00-03:59 masih dihitung hari kemarin (lihat Report_model)
+  DateTime _date = DateTime.now().subtract(const Duration(hours: 4));
   bool _printing = false;
   bool _printingCafeItems = false;
 
@@ -50,7 +52,10 @@ class _TutupKasDialogState extends State<TutupKasDialog> {
     });
 
     try {
-      final summary = await _repository.getTodaySummary(userId: widget.userId);
+      final summary = await _repository.getTodaySummary(
+        userId: widget.userId,
+        date: _date,
+      );
 
       if (!mounted) return;
       setState(() {
@@ -64,6 +69,19 @@ class _TutupKasDialogState extends State<TutupKasDialog> {
         _loading = false;
       });
     }
+  }
+
+  Future<void> _pickDate() async {
+    final now = DateTime.now().subtract(const Duration(hours: 4));
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _date,
+      firstDate: DateTime(now.year - 2),
+      lastDate: now,
+    );
+    if (picked == null || !mounted) return;
+    _date = picked;
+    await _load();
   }
 
   Future<void> _print() async {
@@ -284,9 +302,27 @@ class _TutupKasDialogState extends State<TutupKasDialog> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text("Tanggal", style: AppText.bodySecondary),
-            Text(
-              formatFullDate(summary.businessDate),
-              style: AppText.body.copyWith(fontWeight: FontWeight.w600),
+            InkWell(
+              onTap: _pickDate,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      formatFullDate(summary.businessDate),
+                      style: AppText.body.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(width: 6),
+                    const Icon(
+                      Icons.calendar_month_rounded,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),

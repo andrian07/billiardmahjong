@@ -84,10 +84,7 @@ class TableRepository {
     }
   }
 
-  PoolTable _tableFromJson(
-    Map<String, dynamic> json,
-    Map<int, Promo> promos,
-  ) {
+  PoolTable _tableFromJson(Map<String, dynamic> json, Map<int, Promo> promos) {
     final isRunning = json['table_active']?.toString() == "1";
     final number = json['table_number']?.toString() ?? "";
     final mode = json['table_mode']?.toString();

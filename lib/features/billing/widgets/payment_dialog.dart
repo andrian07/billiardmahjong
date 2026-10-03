@@ -25,6 +25,9 @@ class PaymentResult {
   final int discountAmount;
   final int total;
 
+  /// Nomor nota asli dari backend (null kalau server tidak mengirim).
+  final String? invoiceNumber;
+
   const PaymentResult({
     required this.paymentMethod,
     this.customerName,
@@ -32,6 +35,7 @@ class PaymentResult {
     required this.subtotal,
     required this.discountAmount,
     required this.total,
+    this.invoiceNumber,
   });
 }
 
@@ -445,29 +449,32 @@ class _PaymentDialogState extends State<PaymentDialog> {
       // dipakai pada percobaan pertama & percobaan ulang setelah disetujui.
       final approvalRef = generateApprovalRef();
 
-      Future<void> pay() => _billingRepository.submitPayment(
-        tableId: widget.table.id,
-        mode: widget.table.sessionType,
-        startTime: startAt,
-        endTime: playEnd,
-        duration: playEnd.isAfter(startAt)
-            ? playEnd.difference(startAt)
-            : Duration.zero,
-        subTotal: calculation.totalBilling,
-        tax: calculation.totalTax,
-        totalBill: calculation.totalTransaksi,
-        createdBy: createdBy,
-        paidBy: paidBy,
-        paymentId: paymentMethod.id,
-        customerId: _selectedCustomerId,
-        promoId: _selectedPromo?.id,
-        saveTime: _showSaveTime ? _saveTime : null,
-        remainingTime: _isTimerMode && endAt != null
-            ? (endAt.isAfter(now) ? endAt.difference(now) : Duration.zero)
-            : null,
-        usedSavedTime: widget.table.usedSavedTime,
-        memberApprovalRef: approvalRef,
-      );
+      String? invoiceNumber;
+      Future<void> pay() async {
+        invoiceNumber = await _billingRepository.submitPayment(
+          tableId: widget.table.id,
+          mode: widget.table.sessionType,
+          startTime: startAt,
+          endTime: playEnd,
+          duration: playEnd.isAfter(startAt)
+              ? playEnd.difference(startAt)
+              : Duration.zero,
+          subTotal: calculation.totalBilling,
+          tax: calculation.totalTax,
+          totalBill: calculation.totalTransaksi,
+          createdBy: createdBy,
+          paidBy: paidBy,
+          paymentId: paymentMethod.id,
+          customerId: _selectedCustomerId,
+          promoId: _selectedPromo?.id,
+          saveTime: _showSaveTime ? _saveTime : null,
+          remainingTime: _isTimerMode && endAt != null
+              ? (endAt.isAfter(now) ? endAt.difference(now) : Duration.zero)
+              : null,
+          usedSavedTime: widget.table.usedSavedTime,
+          memberApprovalRef: approvalRef,
+        );
+      }
 
       try {
         await pay();
@@ -502,6 +509,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
           subtotal: calculation.totalBilling,
           discountAmount: calculation.totalPromo,
           total: calculation.totalTransaksi,
+          invoiceNumber: invoiceNumber,
         ),
       );
     } on BillingRepositoryException catch (e) {

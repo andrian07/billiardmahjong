@@ -29,7 +29,7 @@ class InvoiceRepository {
       Receipt(
         businessName: BusinessInfo.name,
         businessAddress: BusinessInfo.address,
-        invoiceNumber: _buildInvoiceNumber(now),
+        invoiceNumber: payment.invoiceNumber ?? _buildInvoiceNumber(now),
         tableLabel: "${_tableNumber(table)} - ${_sessionLabel(table)}",
         periods: const [],
         date: now,

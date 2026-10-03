@@ -27,7 +27,8 @@ class MemberApprovalRequiredException implements Exception {
     String ref,
     Map<String, dynamic>? approval,
   ) {
-    int asInt(dynamic v) => v is int ? v : int.tryParse(v?.toString() ?? "") ?? 0;
+    int asInt(dynamic v) =>
+        v is int ? v : int.tryParse(v?.toString() ?? "") ?? 0;
     return MemberApprovalRequiredException(
       ref: ref,
       amount: asInt(approval?['amount']),
@@ -101,9 +102,7 @@ class MemberApprovalRepository {
     } on MemberApprovalException {
       rethrow;
     } on DioException catch (_) {
-      throw const MemberApprovalException(
-        "Tidak dapat terhubung ke server.",
-      );
+      throw const MemberApprovalException("Tidak dapat terhubung ke server.");
     }
   }
 }
