@@ -1,7 +1,7 @@
 class BusinessInfo {
   BusinessInfo._();
 
-  static const name = "Bacoot LT. 2";
-  static const address = "Gedung Pelni, Jl. Slt. Abdurrahman";
+  static const name = "Gemilang";
+  static const address = "Jl. 28 Oktober";
   static const outletCode = "1";
 }

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../services/booking_watcher.dart';
 import '../../services/product_stock_sync_watcher.dart';
 import '../../services/session_storage.dart';
 import '../../services/sync_watcher.dart';
@@ -54,7 +53,7 @@ class _AppLayoutState extends State<AppLayout> {
     // Runs until logout (see navigateToMenu), independent of page navigation.
     TimerExpiryWatcher.instance.start();
     TopupWatcher.instance.start();
-    BookingWatcher.instance.start();
+    // Booking Room disembunyikan: watcher tidak dijalankan (tidak polling / cetak slip booking)
     SyncWatcher.instance.start();
     ProductStockSyncWatcher.instance.start();
   }

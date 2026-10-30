@@ -5,13 +5,10 @@ import '../../core/constants/app_sizes.dart';
 import '../../core/navigation/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text.dart';
-import '../../features/attendance/widgets/absensi_scan_dialog.dart';
 import '../../features/billing/data/billing_repository.dart';
-import '../../features/cashier/widgets/expense_dialog.dart';
 import '../../features/cashier/widgets/tutup_kas_dialog.dart';
 import '../../features/topup/widgets/topup_requests_dialog.dart';
 import '../../models/pool_table.dart';
-import '../../services/booking_watcher.dart';
 import '../../services/session_storage.dart';
 import '../../services/timer_expiry_watcher.dart';
 import '../../services/topup_watcher.dart';
@@ -39,6 +36,7 @@ class _AppHeaderState extends State<AppHeader>
     with SingleTickerProviderStateMixin {
   String _username = "";
   String _roleName = "";
+  bool _isOwner = false;
 
   // Diffed against TimerExpiryWatcher.instance.expiredTables on every tick
   // so a toast only fires for a table that JUST expired, not for ones that
@@ -95,17 +93,16 @@ class _AppHeaderState extends State<AppHeader>
 
     for (final table in newlyExpired) {
       final pageLabel = table.categoryType == "mahjong" ? "Mahjong" : "Billing";
-      AppToast.error(
-        context,
-        "Waktu ${table.name} ($pageLabel) sudah habis!",
-      );
+      AppToast.error(context, "Waktu ${table.name} ($pageLabel) sudah habis!");
     }
   }
 
   Future<void> _loadSession() async {
     final session = await SessionStorage().getSession();
+    final isOwner = await SessionStorage().isSuperadmin();
     if (!mounted) return;
     setState(() {
+      _isOwner = isOwner;
       _username = session?['username']?.toString() ?? "";
       _roleName = session?['roleName']?.toString() ?? "";
     });
@@ -168,53 +165,24 @@ class _AppHeaderState extends State<AppHeader>
             const SizedBox(width: 8),
           ],
 
-          OutlinedButton.icon(
-            onPressed: () => _openExpense(context),
-            icon: const Icon(Icons.payments_outlined, size: 18),
-            label: const Text("Pengeluaran"),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.textSecondary,
-              side: const BorderSide(color: AppColors.border),
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+          // Tutup Kas hanya untuk owner (role 1)
+          if (_isOwner) ...[
+            OutlinedButton.icon(
+              onPressed: () => _openTutupKas(context),
+              icon: const Icon(Icons.summarize_rounded, size: 18),
+              label: const Text("Tutup Kas"),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.textSecondary,
+                side: const BorderSide(color: AppColors.border),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+                ),
               ),
             ),
-          ),
 
-          const SizedBox(width: 8),
-
-          OutlinedButton.icon(
-            onPressed: () => _openAbsensiScan(context),
-            icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
-            label: const Text("Absensi"),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.textSecondary,
-              side: const BorderSide(color: AppColors.border),
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-              ),
-            ),
-          ),
-
-          const SizedBox(width: 8),
-
-          OutlinedButton.icon(
-            onPressed: () => _openTutupKas(context),
-            icon: const Icon(Icons.summarize_rounded, size: 18),
-            label: const Text("Tutup Kas"),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.textSecondary,
-              side: const BorderSide(color: AppColors.border),
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-              ),
-            ),
-          ),
-
-          const SizedBox(width: 8),
+            const SizedBox(width: 8),
+          ],
 
           ValueListenableBuilder<int>(
             valueListenable: TopupWatcher.instance.unreadCount,
@@ -226,23 +194,6 @@ class _AppHeaderState extends State<AppHeader>
                   isLabelVisible: count > 0,
                   label: Text("$count"),
                   child: const Icon(Icons.notifications_outlined),
-                ),
-              );
-            },
-          ),
-
-          const SizedBox(width: 8),
-
-          ValueListenableBuilder<int>(
-            valueListenable: BookingWatcher.instance.unreadCount,
-            builder: (context, count, _) {
-              return IconButton(
-                tooltip: "Booking Room",
-                onPressed: () => context.go('/booking'),
-                icon: Badge(
-                  isLabelVisible: count > 0,
-                  label: Text("$count"),
-                  child: const Icon(Icons.event_seat_outlined),
                 ),
               );
             },
@@ -319,10 +270,7 @@ class _AppHeaderState extends State<AppHeader>
   }
 
   void _openTopupRequests(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => const TopupRequestsDialog(),
-    );
+    showDialog(context: context, builder: (_) => const TopupRequestsDialog());
   }
 
   void _openExpiredTables(BuildContext context, List<PoolTable> tables) {
@@ -356,9 +304,7 @@ class _AppHeaderState extends State<AppHeader>
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: Icon(
-                    isMahjong
-                        ? Icons.casino_outlined
-                        : Icons.table_bar_rounded,
+                    isMahjong ? Icons.casino_outlined : Icons.table_bar_rounded,
                     color: AppColors.danger,
                   ),
                   title: Text(
@@ -385,29 +331,6 @@ class _AppHeaderState extends State<AppHeader>
           ),
         ],
       ),
-    );
-  }
-
-  void _openAbsensiScan(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => const AbsensiScanDialog(),
-    );
-  }
-
-  Future<void> _openExpense(BuildContext context) async {
-    final session = await SessionStorage().getSession();
-    final userId = int.tryParse(session?['id']?.toString() ?? "") ?? 0;
-    final cashierName = session?['username']?.toString() ?? "Kasir";
-
-    if (!context.mounted) return;
-    if (userId == 0) {
-      AppToast.error(context, "Sesi tidak valid, silakan login ulang.");
-      return;
-    }
-    showDialog(
-      context: context,
-      builder: (_) => ExpenseDialog(userId: userId, cashierName: cashierName),
     );
   }
 

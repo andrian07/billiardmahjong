@@ -448,12 +448,7 @@ class _TransactionPageState extends State<TransactionPage> {
         _tabChip(_TransactionTab.mahjong, "Mahjong", Icons.casino_outlined),
         const SizedBox(width: 10),
         _tabChip(_TransactionTab.cafe, "Cafe", Icons.local_cafe_outlined),
-        const SizedBox(width: 10),
-        _tabChip(
-          _TransactionTab.saldo,
-          "Pengisian Saldo",
-          Icons.savings_outlined,
-        ),
+        // tab Pengisian Saldo disembunyikan (kode & enum tetap ada)
       ],
     );
   }

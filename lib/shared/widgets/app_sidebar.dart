@@ -50,21 +50,11 @@ class AppSidebar extends StatelessWidget {
           icon: Icons.receipt_long_rounded,
           menuKey: "transaksi",
         ),
-        AppMenuItem(
-          title: "Booking Room",
-          icon: Icons.event_seat_rounded,
-          menuKey: "booking",
-        ),
       ],
     ),
     SidebarSection(
       title: "MASTER",
       items: [
-        AppMenuItem(
-          title: "Member",
-          icon: Icons.people_alt_outlined,
-          menuKey: "pelanggan",
-        ),
         AppMenuItem(
           title: "Pengguna",
           icon: Icons.manage_accounts_outlined,
@@ -164,11 +154,6 @@ class AppSidebar extends StatelessWidget {
           title: "Ganti Password",
           icon: Icons.lock_reset_rounded,
           menuKey: "ganti_password",
-        ),
-        AppMenuItem(
-          title: "Tukar Point",
-          icon: Icons.card_giftcard_rounded,
-          menuKey: "setting_point_exchange",
         ),
       ],
     ),
