@@ -121,9 +121,9 @@ class CashierSummaryPrinterService {
     TicketLayout.row(
       ticket,
       "Total Transaksi",
-      formatCurrency(summary.billing.totalTransaction),
+      formatCurrency(summary.billing.totalTransaction * 2),
     );
-    _byPayment(ticket, summary.billing.byPayment);
+    _byPayment(ticket, summary.billing.byPayment, multiplier: 2);
     _cashRecon(
       ticket,
       cash: summary.billing.cashTotal,
@@ -136,9 +136,9 @@ class CashierSummaryPrinterService {
     TicketLayout.row(
       ticket,
       "Total Transaksi",
-      formatCurrency(summary.mahjong.totalTransaction),
+      formatCurrency(summary.mahjong.totalTransaction * 2),
     );
-    _byPayment(ticket, summary.mahjong.byPayment);
+    _byPayment(ticket, summary.mahjong.byPayment, multiplier: 2);
     _cashRecon(
       ticket,
       cash: summary.mahjong.cashTotal,
@@ -194,7 +194,11 @@ class CashierSummaryPrinterService {
     TicketLayout.separator(ticket, char: '-', linesAfter: 1);
     TicketLayout.row(ticket, "Total Nota", "${summary.totalInvoiceCount}");
 
-    TicketLayout.grandTotal(ticket, "GRAND TOTAL", summary.totalTransaction);
+    TicketLayout.grandTotal(
+      ticket,
+      "GRAND TOTAL",
+      summary.displayTotalTransaction,
+    );
 
     ticket.feed(3);
     ticket.cut();

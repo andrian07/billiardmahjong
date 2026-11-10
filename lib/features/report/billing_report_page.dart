@@ -19,7 +19,19 @@ import 'data/report_repository.dart';
 /// Rekap transaksi billing meja — Report/billing_report, dengan filter
 /// tanggal (wajib), member, dan kasir, serta export ke Excel/PDF.
 class BillingReportPage extends StatefulWidget {
-  const BillingReportPage({super.key});
+  const BillingReportPage({
+    super.key,
+    this.categoryType = "billiard",
+    this.pageTitle = "Laporan Billiard",
+    this.pageSubtitle = "Rekap transaksi meja billiard",
+    this.menuKey = "laporan_billing",
+  });
+
+  /// 'billiard' / 'mahjong' - transaksi meja jenis mana yang dilaporkan.
+  final String categoryType;
+  final String pageTitle;
+  final String pageSubtitle;
+  final String menuKey;
 
   @override
   State<BillingReportPage> createState() => _BillingReportPageState();
@@ -54,7 +66,8 @@ class _BillingReportPageState extends State<BillingReportPage> {
     _loadFiltersAndReport();
   }
 
-  DateTime _dateOnly(DateTime date) => DateTime(date.year, date.month, date.day);
+  DateTime _dateOnly(DateTime date) =>
+      DateTime(date.year, date.month, date.day);
 
   Future<void> _loadFiltersAndReport() async {
     try {
@@ -87,6 +100,7 @@ class _BillingReportPageState extends State<BillingReportPage> {
         dateTo: _dateTo,
         customerId: _selectedCustomer?.id,
         paidBy: _selectedKasir?.id,
+        categoryType: widget.categoryType,
       );
       if (!mounted) return;
       setState(() {
@@ -141,10 +155,11 @@ class _BillingReportPageState extends State<BillingReportPage> {
         dateTo: _dateTo,
         customerId: _selectedCustomer?.id,
         paidBy: _selectedKasir?.id,
+        categoryType: widget.categoryType,
         type: type,
       );
       final savePath = await FilePicker.platform.saveFile(
-        dialogTitle: "Simpan Laporan Billing",
+        dialogTitle: "Simpan ${widget.pageTitle}",
         fileName: file.filename,
         bytes: file.bytes,
       );
@@ -171,10 +186,10 @@ class _BillingReportPageState extends State<BillingReportPage> {
   @override
   Widget build(BuildContext context) {
     return AppLayout(
-      title: "Laporan Billing",
-      subtitle: "Rekap transaksi billing meja",
+      title: widget.pageTitle,
+      subtitle: widget.pageSubtitle,
       showSearch: false,
-      activeMenuKey: "laporan_billing",
+      activeMenuKey: widget.menuKey,
       onMenuSelect: (key) => navigateToMenu(context, key),
       onRefresh: _loadFiltersAndReport,
       child: _buildCard(),
@@ -203,7 +218,11 @@ class _BillingReportPageState extends State<BillingReportPage> {
       runSpacing: 12,
       crossAxisAlignment: WrapCrossAlignment.end,
       children: [
-        _dateField(label: "Dari Tanggal", value: _dateFrom, onTap: _pickDateFrom),
+        _dateField(
+          label: "Dari Tanggal",
+          value: _dateFrom,
+          onTap: _pickDateFrom,
+        ),
         _dateField(label: "Sampai Tanggal", value: _dateTo, onTap: _pickDateTo),
         SizedBox(width: 220, child: _customerDropdown()),
         SizedBox(width: 200, child: _kasirDropdown()),
@@ -361,7 +380,10 @@ class _BillingReportPageState extends State<BillingReportPage> {
         icon: Icons.badge_outlined,
       ),
       items: [
-        const DropdownMenuItem<AppUser?>(value: null, child: Text("Semua Kasir")),
+        const DropdownMenuItem<AppUser?>(
+          value: null,
+          child: Text("Semua Kasir"),
+        ),
         for (final kasir in _kasirs)
           DropdownMenuItem<AppUser?>(
             value: kasir,
@@ -372,7 +394,10 @@ class _BillingReportPageState extends State<BillingReportPage> {
     );
   }
 
-  InputDecoration _filterDecoration({required String hint, required IconData icon}) {
+  InputDecoration _filterDecoration({
+    required String hint,
+    required IconData icon,
+  }) {
     return InputDecoration(
       hintText: hint,
       hintStyle: AppText.caption,
@@ -439,12 +464,12 @@ class _BillingReportPageState extends State<BillingReportPage> {
           child: ListView.separated(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
             itemCount: result.rows.length,
-            separatorBuilder: (_, _) => const Divider(
-              height: 1,
-              color: AppColors.divider,
+            separatorBuilder: (_, _) =>
+                const Divider(height: 1, color: AppColors.divider),
+            itemBuilder: (context, index) => _BillingReportRowWidget.data(
+              no: index + 1,
+              row: result.rows[index],
             ),
-            itemBuilder: (context, index) =>
-                _BillingReportRowWidget.data(no: index + 1, row: result.rows[index]),
           ),
         ),
         const Divider(height: 1, color: AppColors.divider),
@@ -594,7 +619,12 @@ class _BillingReportRowWidget extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: cellStyle,
         ),
-        kasir: Text(r.kasirName, maxLines: 1, overflow: TextOverflow.ellipsis, style: cellStyle),
+        kasir: Text(
+          r.kasirName,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: cellStyle,
+        ),
         payment: Text(r.paymentName, style: cellStyle),
         promo: Text(
           _promoLabel(r),

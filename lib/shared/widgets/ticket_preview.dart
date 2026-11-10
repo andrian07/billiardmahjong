@@ -225,20 +225,23 @@ class TicketPreviewContent {
       if (receipt.periods.isNotEmpty) ...[
         TicketPreviewLayout.sectionTitle("Rincian Waktu"),
         for (final period in receipt.periods) ...[
-          TicketPreviewLayout.row(period.label, formatCurrency(period.cost)),
+          TicketPreviewLayout.row(
+            period.label,
+            formatCurrency(period.cost * 2),
+          ),
           TicketPreviewLayout.row("  Durasi", formatDuration(period.duration)),
         ],
       ],
       TicketPreviewLayout.separator(),
-      TicketPreviewLayout.row("Subtotal", formatCurrency(receipt.subtotal)),
+      TicketPreviewLayout.row("Subtotal", formatCurrency(receipt.subtotal * 2)),
       if (receipt.promoName != null)
         TicketPreviewLayout.row("Promo", receipt.promoName!),
       if (receipt.discountAmount > 0)
         TicketPreviewLayout.row(
           "Diskon",
-          "-${formatCurrency(receipt.discountAmount)}",
+          "-${formatCurrency(receipt.discountAmount * 2)}",
         ),
-      TicketPreviewLayout.grandTotal("GRAND TOTAL", receipt.grandTotal),
+      TicketPreviewLayout.grandTotal("GRAND TOTAL", receipt.grandTotal * 2),
       TicketPreviewLayout.row("Bayar", receipt.paymentMethod),
       ...TicketPreviewLayout.footer(receipt.cashierName),
     ];
@@ -348,9 +351,9 @@ class TicketPreviewContent {
       TicketPreviewLayout.row("Jumlah Nota", "${summary.billing.invoiceCount}"),
       TicketPreviewLayout.row(
         "Total Transaksi",
-        formatCurrency(summary.billing.totalTransaction),
+        formatCurrency(summary.billing.totalTransaction * 2),
       ),
-      ..._byPayment(summary.billing.byPayment),
+      ..._byPayment(summary.billing.byPayment, multiplier: 2),
       ..._cashRecon(
         cash: summary.billing.cashTotal,
         expense: summary.expenseTotalBilling,
@@ -360,9 +363,9 @@ class TicketPreviewContent {
       TicketPreviewLayout.row("Jumlah Nota", "${summary.mahjong.invoiceCount}"),
       TicketPreviewLayout.row(
         "Total Transaksi",
-        formatCurrency(summary.mahjong.totalTransaction),
+        formatCurrency(summary.mahjong.totalTransaction * 2),
       ),
-      ..._byPayment(summary.mahjong.byPayment),
+      ..._byPayment(summary.mahjong.byPayment, multiplier: 2),
       ..._cashRecon(
         cash: summary.mahjong.cashTotal,
         expense: summary.expenseTotalMahjong,
@@ -405,7 +408,10 @@ class TicketPreviewContent {
       ],
       TicketPreviewLayout.separator(),
       TicketPreviewLayout.row("Total Nota", "${summary.totalInvoiceCount}"),
-      TicketPreviewLayout.grandTotal("GRAND TOTAL", summary.totalTransaction),
+      TicketPreviewLayout.grandTotal(
+        "GRAND TOTAL",
+        summary.displayTotalTransaction,
+      ),
     ];
   }
 

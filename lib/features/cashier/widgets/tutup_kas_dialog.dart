@@ -346,6 +346,7 @@ class _TutupKasDialogState extends State<TutupKasDialog> {
                 icon: Icons.table_bar_rounded,
                 title: "Billiard",
                 summary: summary.billing,
+                multiplier: 2,
                 expenseTotal: summary.expenseTotalBilling,
                 netCash: summary.billingNetCash,
               ),
@@ -356,6 +357,7 @@ class _TutupKasDialogState extends State<TutupKasDialog> {
                 icon: Icons.casino_outlined,
                 title: "Mahjong",
                 summary: summary.mahjong,
+                multiplier: 2,
                 expenseTotal: summary.expenseTotalMahjong,
                 netCash: summary.mahjongNetCash,
               ),
@@ -414,7 +416,7 @@ class _TutupKasDialogState extends State<TutupKasDialog> {
               style: AppText.body.copyWith(fontWeight: FontWeight.w700),
             ),
             Text(
-              formatCurrency(summary.totalTransaction),
+              formatCurrency(summary.displayTotalTransaction),
               style: AppText.title.copyWith(
                 color: AppColors.success,
                 fontWeight: FontWeight.w700,

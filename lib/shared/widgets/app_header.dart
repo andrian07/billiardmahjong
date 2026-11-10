@@ -36,7 +36,6 @@ class _AppHeaderState extends State<AppHeader>
     with SingleTickerProviderStateMixin {
   String _username = "";
   String _roleName = "";
-  bool _isOwner = false;
 
   // Diffed against TimerExpiryWatcher.instance.expiredTables on every tick
   // so a toast only fires for a table that JUST expired, not for ones that
@@ -99,10 +98,8 @@ class _AppHeaderState extends State<AppHeader>
 
   Future<void> _loadSession() async {
     final session = await SessionStorage().getSession();
-    final isOwner = await SessionStorage().isSuperadmin();
     if (!mounted) return;
     setState(() {
-      _isOwner = isOwner;
       _username = session?['username']?.toString() ?? "";
       _roleName = session?['roleName']?.toString() ?? "";
     });
@@ -165,24 +162,21 @@ class _AppHeaderState extends State<AppHeader>
             const SizedBox(width: 8),
           ],
 
-          // Tutup Kas hanya untuk owner (role 1)
-          if (_isOwner) ...[
-            OutlinedButton.icon(
-              onPressed: () => _openTutupKas(context),
-              icon: const Icon(Icons.summarize_rounded, size: 18),
-              label: const Text("Tutup Kas"),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.textSecondary,
-                side: const BorderSide(color: AppColors.border),
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-                ),
+          OutlinedButton.icon(
+            onPressed: () => _openTutupKas(context),
+            icon: const Icon(Icons.summarize_rounded, size: 18),
+            label: const Text("Tutup Kas"),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.textSecondary,
+              side: const BorderSide(color: AppColors.border),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
               ),
             ),
+          ),
 
-            const SizedBox(width: 8),
-          ],
+          const SizedBox(width: 8),
 
           ValueListenableBuilder<int>(
             valueListenable: TopupWatcher.instance.unreadCount,

@@ -22,6 +22,7 @@ const _routesByKey = {
   'produk': '/produk',
   'pembelian': '/pembelian',
   'laporan_billing': '/laporan/billing',
+  'laporan_mahjong': '/laporan/mahjong',
   'laporan_cafe': '/laporan/cafe',
   'laporan_saldo': '/laporan/saldo',
   'laporan_stok': '/laporan/stok',

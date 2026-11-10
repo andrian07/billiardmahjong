@@ -200,6 +200,12 @@ class CashierClosingSummary {
       mahjong.totalTransaction +
       cafe.totalTransaction;
 
+  /// Nominal billiard + mahjong yang ditampilkan ×2 di nota/tutup kas (lihat
+  /// receipt_printer_service.dart), dipakai sebagai Grand Total tercetak.
+  int get displayTotalTransaction =>
+      (billing.totalTransaction + mahjong.totalTransaction) * 2 +
+      cafe.totalTransaction;
+
   int get totalInvoiceCount =>
       billing.invoiceCount +
       mahjong.invoiceCount +

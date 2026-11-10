@@ -34,10 +34,12 @@ class ReportRepository {
     required DateTime dateTo,
     int? customerId,
     int? paidBy,
+    String? categoryType,
   }) async {
     final data = await _post(ApiEndpoints.billingReport, {
       "date_from": formatApiDate(dateFrom),
       "date_to": formatApiDate(dateTo),
+      if (categoryType != null) "category_type": categoryType,
       if (customerId != null && customerId != 0) "customer_id": customerId,
       if (paidBy != null && paidBy != 0) "paid_by": paidBy,
       "type": "view",
@@ -122,6 +124,7 @@ class ReportRepository {
     required DateTime dateTo,
     int? customerId,
     int? paidBy,
+    String? categoryType,
     required String type,
   }) {
     return _download(
@@ -129,11 +132,14 @@ class ReportRepository {
       {
         "date_from": formatApiDate(dateFrom),
         "date_to": formatApiDate(dateTo),
+        if (categoryType != null) "category_type": categoryType,
         if (customerId != null && customerId != 0) "customer_id": customerId,
         if (paidBy != null && paidBy != 0) "paid_by": paidBy,
         "type": type,
       },
-      defaultBasename: "laporan_billing",
+      defaultBasename: categoryType == "mahjong"
+          ? "laporan_mahjong"
+          : "laporan_billing",
       type: type,
     );
   }

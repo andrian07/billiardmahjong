@@ -85,9 +85,8 @@ final appRouter = GoRouter(
       // BillingPage ini widget yang "sama" (tipe sama, tidak ada key) dan cuma meng-update
       // instance lama saat pindah route alih-alih membuat baru, jadi initState()/_loadTables()
       // tidak pernah jalan ulang dan daftar meja nyangkut di data halaman yang dibuka duluan.
-      pageBuilder: (context, state) => _fadeThroughPage(
-        const BillingPage(key: ValueKey("meja")),
-      ),
+      pageBuilder: (context, state) =>
+          _fadeThroughPage(const BillingPage(key: ValueKey("meja"))),
     ),
     GoRoute(
       path: "/mahjong",
@@ -152,18 +151,29 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: "/opname/tambah",
-      pageBuilder: (context, state) =>
-          _fadeThroughPage(const OpnameAddPage()),
+      pageBuilder: (context, state) => _fadeThroughPage(const OpnameAddPage()),
     ),
     GoRoute(
       path: "/laporan/billing",
-      pageBuilder: (context, state) =>
-          _fadeThroughPage(const BillingReportPage()),
+      pageBuilder: (context, state) => _fadeThroughPage(
+        const BillingReportPage(key: ValueKey("laporan_billing")),
+      ),
+    ),
+    GoRoute(
+      path: "/laporan/mahjong",
+      pageBuilder: (context, state) => _fadeThroughPage(
+        const BillingReportPage(
+          key: ValueKey("laporan_mahjong"),
+          categoryType: "mahjong",
+          pageTitle: "Laporan Mahjong",
+          pageSubtitle: "Rekap transaksi meja mahjong",
+          menuKey: "laporan_mahjong",
+        ),
+      ),
     ),
     GoRoute(
       path: "/laporan/cafe",
-      pageBuilder: (context, state) =>
-          _fadeThroughPage(const CafeReportPage()),
+      pageBuilder: (context, state) => _fadeThroughPage(const CafeReportPage()),
     ),
     GoRoute(
       path: "/laporan/saldo",

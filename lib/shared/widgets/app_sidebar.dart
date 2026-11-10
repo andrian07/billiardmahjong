@@ -106,9 +106,14 @@ class AppSidebar extends StatelessWidget {
       title: "LAPORAN",
       items: [
         AppMenuItem(
-          title: "Laporan Billing",
+          title: "Laporan Billiard",
           icon: Icons.table_chart_outlined,
           menuKey: "laporan_billing",
+        ),
+        AppMenuItem(
+          title: "Laporan Mahjong",
+          icon: Icons.casino_outlined,
+          menuKey: "laporan_mahjong",
         ),
         AppMenuItem(
           title: "Laporan Cafe",
@@ -199,9 +204,7 @@ class AppSidebar extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeInOut,
-      width: collapsed
-          ? AppSizes.sidebarCollapsedWidth
-          : AppSizes.sidebarWidth,
+      width: collapsed ? AppSizes.sidebarCollapsedWidth : AppSizes.sidebarWidth,
       color: AppColors.sidebar,
       padding: EdgeInsets.symmetric(
         horizontal: collapsed ? 12 : 20,
@@ -302,22 +305,14 @@ class AppSidebar extends StatelessWidget {
     );
 
     if (collapsed) {
-      return Column(
-        children: [
-          logo,
-          const SizedBox(height: 12),
-          toggleButton,
-        ],
-      );
+      return Column(children: [logo, const SizedBox(height: 12), toggleButton]);
     }
 
     return Row(
       children: [
         logo,
         const SizedBox(width: 10),
-        Expanded(
-          child: Text("Billing", style: AppText.title, maxLines: 2),
-        ),
+        Expanded(child: Text("Billing", style: AppText.title, maxLines: 2)),
         toggleButton,
       ],
     );
